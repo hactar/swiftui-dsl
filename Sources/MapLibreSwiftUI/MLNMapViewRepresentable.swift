@@ -39,6 +39,14 @@ public protocol MLNMapViewRepresentable: AnyObject {
     @MainActor var visibleCoordinateBounds: MLNCoordinateBounds { get }
     @MainActor var contentInset: UIEdgeInsets { get }
     @MainActor func convert(_ coordinate: CLLocationCoordinate2D, toPointTo: UIView?) -> CGPoint
+    @MainActor func visibleFeatures(
+        at point: CGPoint,
+        styleLayerIdentifiers: Set<String>?
+    ) -> [any MLNFeature]
+    @MainActor func visibleFeatures(
+        in rect: CGRect,
+        styleLayerIdentifiers: Set<String>?
+    ) -> [any MLNFeature]
 }
 
 extension MLNMapView: MLNMapViewRepresentable {

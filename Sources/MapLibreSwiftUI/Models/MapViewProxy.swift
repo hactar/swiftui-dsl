@@ -62,6 +62,32 @@ public struct MapViewProxy {
         mapView.convert(coordinate, toPointTo: toPointTo)
     }
 
+    /// Query rendered features at a screen point.
+    ///
+    /// - Parameters:
+    ///   - point: The point in the map view coordinate space.
+    ///   - styleLayerIdentifiers: Optional style layer ids to constrain the query.
+    /// - Returns: Features rendered at that point.
+    public func visibleFeatures(
+        at point: CGPoint,
+        styleLayerIdentifiers: Set<String>? = nil
+    ) -> [any MLNFeature] {
+        mapView.visibleFeatures(at: point, styleLayerIdentifiers: styleLayerIdentifiers)
+    }
+
+    /// Query rendered features in a screen rectangle.
+    ///
+    /// - Parameters:
+    ///   - rect: The rectangle in the map view coordinate space.
+    ///   - styleLayerIdentifiers: Optional style layer ids to constrain the query.
+    /// - Returns: Features rendered in that rectangle.
+    public func visibleFeatures(
+        in rect: CGRect,
+        styleLayerIdentifiers: Set<String>? = nil
+    ) -> [any MLNFeature] {
+        mapView.visibleFeatures(in: rect, styleLayerIdentifiers: styleLayerIdentifiers)
+    }
+
     /// Initialize with an MLNMapView (captures current values)
     /// - Parameters:
     ///   - mapView: The MLNMapView to capture values from
