@@ -46,6 +46,7 @@ MLNMapViewDelegate {
     var onStyleLoaded: ((MLNStyle) -> Void)?
     var onUserTrackingModeChange: ((MLNUserTrackingMode, Bool) -> Void)?
     var onMapIdle: ((MapViewProxy) -> Void)?
+    var onMapDidFinishRenderingMap: ((MapViewProxy, Bool) -> Void)?
     var onGesture: (MLNMapView, UIGestureRecognizer) -> Void
     var onViewProxyChanged: (MapViewProxy) -> Void
     var proxyUpdateMode: ProxyUpdateMode
@@ -396,8 +397,14 @@ MLNMapViewDelegate {
 
     // MARK: - MLNMapViewDelegate
 
-    public func mapView(_: MLNMapView, didFinishLoading mglStyle: MLNStyle) {
+    @MainActor
+    public func mapView(_ mapView: MLNMapView, didFinishLoading mglStyle: MLNStyle) {
         addLayers(to: mglStyle)
+        let viewProxy = MapViewProxy(
+            mapView: mapView,
+            lastReasonForChange: nil
+        )
+        onViewProxyChanged(viewProxy)
         onStyleLoaded?(mglStyle)
     }
 
@@ -437,6 +444,15 @@ MLNMapViewDelegate {
             lastReasonForChange: nil
         )
         onMapIdle?(viewProxy)
+    }
+
+    @MainActor
+    public func mapViewDidFinishRenderingMap(_ mapView: MLNMapView, fullyRendered: Bool) {
+        let viewProxy = MapViewProxy(
+            mapView: mapView,
+            lastReasonForChange: nil
+        )
+        onMapDidFinishRenderingMap?(viewProxy, fullyRendered)
     }
 
     @MainActor
