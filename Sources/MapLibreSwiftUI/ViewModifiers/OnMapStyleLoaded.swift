@@ -45,7 +45,7 @@ public extension View {
     func onMapDidFinishRendering(
         _ perform: @escaping (MapViewProxy, Bool) -> Void
     ) -> some View {
-        modifier(OnMapDidFinishRenderingMapViewModifier(onMapDidFinishRendering: perform))
+        modifier(OnMapDidFinishRenderingViewModifier(onMapDidFinishRendering: perform))
     }
 }
 
@@ -67,7 +67,7 @@ extension EnvironmentValues {
     }
 }
 
-private struct OnMapDidFinishRenderingMapViewModifier: ViewModifier {
+private struct OnMapDidFinishRenderingViewModifier: ViewModifier {
     let onMapDidFinishRendering: (MapViewProxy, Bool) -> Void
 
     func body(content: Content) -> some View {
