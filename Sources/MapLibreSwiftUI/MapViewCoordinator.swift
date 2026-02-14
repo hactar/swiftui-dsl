@@ -46,7 +46,7 @@ MLNMapViewDelegate {
     var onStyleLoaded: ((MLNStyle) -> Void)?
     var onUserTrackingModeChange: ((MLNUserTrackingMode, Bool) -> Void)?
     var onMapIdle: ((MapViewProxy) -> Void)?
-    var onMapDidFinishRenderingMap: ((MapViewProxy, Bool) -> Void)?
+    var onMapDidFinishRendering: ((MapViewProxy, Bool) -> Void)?
     var onGesture: (MLNMapView, UIGestureRecognizer) -> Void
     var onViewProxyChanged: (MapViewProxy) -> Void
     var proxyUpdateMode: ProxyUpdateMode
@@ -452,7 +452,7 @@ MLNMapViewDelegate {
             mapView: mapView,
             lastReasonForChange: nil
         )
-        onMapDidFinishRenderingMap?(viewProxy, fullyRendered)
+        onMapDidFinishRendering?(viewProxy, fullyRendered)
     }
 
     @MainActor

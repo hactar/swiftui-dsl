@@ -42,10 +42,10 @@ public extension View {
     /// - Parameter perform: The action to perform with the current map view proxy and render completeness flag.
     /// - Returns: The modified map view.
     @MainActor
-    func onMapDidFinishRenderingMap(
+    func onMapDidFinishRendering(
         _ perform: @escaping (MapViewProxy, Bool) -> Void
     ) -> some View {
-        modifier(OnMapDidFinishRenderingMapViewModifier(onMapDidFinishRenderingMap: perform))
+        modifier(OnMapDidFinishRenderingMapViewModifier(onMapDidFinishRendering: perform))
     }
 }
 
@@ -61,16 +61,16 @@ public extension View {
 
 @MainActor
 extension EnvironmentValues {
-    var onMapDidFinishRenderingMap: ((MapViewProxy, Bool) -> Void)? {
+    var onMapDidFinishRendering: ((MapViewProxy, Bool) -> Void)? {
         get { self[OnMapDidFinishRenderingMapKey.self] }
         set { self[OnMapDidFinishRenderingMapKey.self] = newValue }
     }
 }
 
 private struct OnMapDidFinishRenderingMapViewModifier: ViewModifier {
-    let onMapDidFinishRenderingMap: (MapViewProxy, Bool) -> Void
+    let onMapDidFinishRendering: (MapViewProxy, Bool) -> Void
 
     func body(content: Content) -> some View {
-        content.environment(\.onMapDidFinishRenderingMap, onMapDidFinishRenderingMap)
+        content.environment(\.onMapDidFinishRendering, onMapDidFinishRendering)
     }
 }

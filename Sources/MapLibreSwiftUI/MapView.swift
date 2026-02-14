@@ -33,7 +33,7 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
     @Environment(\.onMapStyleLoaded) var onMapStyleLoaded
     @Environment(\.onMapUserTrackingModeChanged) var onMapUserTrackingModeChanged
     @Environment(\.onMapIdle) var onMapIdle
-    @Environment(\.onMapDidFinishRenderingMap) var onMapDidFinishRenderingMap
+    @Environment(\.onMapDidFinishRendering) var onMapDidFinishRendering
     @Environment(\.mapProxyUpdateMode) var proxyUpdateMode
     @Environment(\.onMapProxyUpdated) var onViewProxyChanged
 
@@ -105,7 +105,7 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
 
         // Link map idle to the coordinator that emits the delegate event.
         context.coordinator.onMapIdle = onMapIdle
-        context.coordinator.onMapDidFinishRenderingMap = onMapDidFinishRenderingMap
+        context.coordinator.onMapDidFinishRendering = onMapDidFinishRendering
 
         // Add all gesture recognizers
         for gesture in gestures {
@@ -124,7 +124,7 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
         context.coordinator.updateStyleSource(styleSource, mapView: uiViewController.mapView)
         context.coordinator.updateLayers(mapView: uiViewController.mapView)
         context.coordinator.onMapIdle = onMapIdle
-        context.coordinator.onMapDidFinishRenderingMap = onMapDidFinishRenderingMap
+        context.coordinator.onMapDidFinishRendering = onMapDidFinishRendering
 
         // FIXME: This isn't exactly telling us if the *map* is loaded, and the docs for setCenter say it needs to be.
         let isStyleLoaded = uiViewController.mapView.style != nil
