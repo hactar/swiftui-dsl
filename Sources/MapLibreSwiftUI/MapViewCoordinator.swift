@@ -47,6 +47,8 @@ MLNMapViewDelegate {
 
     var onStyleLoaded: ((MLNStyle) -> Void)?
     var onUserTrackingModeChange: ((MLNUserTrackingMode, Bool) -> Void)?
+    var onMapIdle: ((MapViewProxy) -> Void)?
+    var onMapDidFinishRendering: ((MapViewProxy, Bool) -> Void)?
     var onGesture: (MLNMapView, UIGestureRecognizer) -> Void
     var onViewProxyChanged: (MapViewProxy) -> Void
     var proxyUpdateMode: ProxyUpdateMode
@@ -406,41 +408,62 @@ MLNMapViewDelegate {
 
     // MARK: - MLNMapViewDelegate
 
-    public func mapView(_: MLNMapView, didFinishLoading mglStyle: MLNStyle) {
+    @MainActor
+    public func mapView(_ mapView: MLNMapView, didFinishLoading mglStyle: MLNStyle) {
         addLayers(to: mglStyle)
+        let viewProxy = MapViewProxy(
+            mapView: mapView,
+            lastReasonForChange: nil
+        )
+        onViewProxyChanged(viewProxy)
         onStyleLoaded?(mglStyle)
     }
 
     /// The MapView's region has changed with a specific reason.
+    @MainActor
     public func mapView(
         _ mapView: MLNMapView, regionDidChangeWith reason: MLNCameraChangeReason, animated _: Bool
     ) {
         // TODO: We could put this in regionIsChangingWith if we calculate significant change/debounce.
-        MainActor.assumeIsolated {
-            // regionIsChangingWith is not called for the final update, so we need to call updateViewProxy
-            // in both modes here.
-            updateViewProxy(mapView: mapView, reason: reason)
+        // regionIsChangingWith is not called for the final update, so we need to call updateViewProxy
+        // in both modes here.
+        updateViewProxy(mapView: mapView, reason: reason)
 
-            guard let changeReason = CameraChangeReason(reason) else {
-                // Invalid state - we cannot process this camera change.
-                return
-            }
+        guard let changeReason = CameraChangeReason(reason) else {
+            // Invalid state - we cannot process this camera change.
+            return
+        }
 
-            switch changeReason {
-            case .gesturePan, .gesturePinch, .gestureRotate,
-                 .gestureZoomIn, .gestureZoomOut, .gestureOneFingerZoom,
-                 .gestureTilt:
-                applyCameraChangeFromGesture(mapView, reason: changeReason)
-            default:
-                break
-            }
+        switch changeReason {
+        case .gesturePan, .gesturePinch, .gestureRotate,
+             .gestureZoomIn, .gestureZoomOut, .gestureOneFingerZoom,
+             .gestureTilt:
+            applyCameraChangeFromGesture(mapView, reason: changeReason)
+        default:
+            break
         }
     }
 
-    public func mapViewDidBecomeIdle(_: MLNMapView) {
+    @MainActor
+    public func mapViewDidBecomeIdle(_ mapView: MLNMapView) {
         cameraUpdateContinuation?.resume()
         cameraUpdateContinuation = nil
         cameraUpdateTask = nil
+
+        let viewProxy = MapViewProxy(
+            mapView: mapView,
+            lastReasonForChange: nil
+        )
+        onMapIdle?(viewProxy)
+    }
+
+    @MainActor
+    public func mapViewDidFinishRenderingMap(_ mapView: MLNMapView, fullyRendered: Bool) {
+        let viewProxy = MapViewProxy(
+            mapView: mapView,
+            lastReasonForChange: nil
+        )
+        onMapDidFinishRendering?(viewProxy, fullyRendered)
     }
 
     @MainActor
