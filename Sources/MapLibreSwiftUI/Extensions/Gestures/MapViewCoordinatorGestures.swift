@@ -32,7 +32,7 @@ extension MapViewCoordinator {
     ///
     /// - Parameter mapView: The MapLibre map view
     private func removeAllGestures(_ mapView: MLNMapView) {
-        managedGestureRecognizers.forEach { gestureRecognizer in
+        for gestureRecognizer in managedGestureRecognizers {
             mapView.removeGestureRecognizer(gestureRecognizer)
         }
         managedGestureRecognizers.removeAll()
