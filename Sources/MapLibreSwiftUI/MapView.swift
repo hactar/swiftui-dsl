@@ -87,8 +87,11 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
 
         switch styleSource {
         case let .url(styleURL):
-            controller.mapView.styleURL = styleURL
+            if controller.mapView.styleURL != styleURL {
+                controller.mapView.styleURL = styleURL
+            }
         }
+        context.coordinator.markStyleSourceApplied(styleSource)
 
         context.coordinator.registerGestureListener()
 
@@ -167,11 +170,7 @@ public extension MapView where T == MLNMapViewController {
         @MapViewContentBuilder _ makeMapContent: () -> [StyleLayerDefinition] = { [] }
     ) {
         self.init(
-            makeViewController: {
-                let vc = MLNMapViewController()
-                vc.activity = activity
-                return vc
-            }(),
+            makeViewController: MLNMapViewController(initialStyleURL: styleURL, activity: activity),
             styleURL: styleURL,
             camera: camera,
             locationManager: locationManager,

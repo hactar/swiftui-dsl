@@ -71,6 +71,12 @@ MLNMapViewDelegate {
         self.proxyUpdateMode = proxyUpdateMode
     }
 
+    /// Seeds the snapshot with the style already applied during map view construction,
+    /// so the first SwiftUI update does not redundantly reload the same style URL.
+    func markStyleSourceApplied(_ source: MapStyleSource) {
+        snapshotStyleSource = source
+    }
+
     // MARK: Core UIView Functionality
 
     @objc func captureGesture(_ sender: UIGestureRecognizer) {
