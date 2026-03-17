@@ -373,9 +373,18 @@ MLNMapViewDelegate {
                                                        edgePadding: padding,
                                                        animated: animated,
                                                        completionHandler: nil)
-                case .showcase:
-                    // TODO: Need a method these/or to finalize a goal here.
-                    break
+                case let .showcase(shapeCollection, padding):
+                    mapView.userTrackingMode = .none
+                    mapView.minimumPitch = 0
+                    mapView.maximumPitch = 0
+                    mapView.direction = 0
+
+                    let camera = mapView.cameraThatFitsShape(
+                        shapeCollection,
+                        direction: 0,
+                        edgePadding: padding
+                    )
+                    mapView.setCamera(camera, animated: animated)
                 }
             }
         }

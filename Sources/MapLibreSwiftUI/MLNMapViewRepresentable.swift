@@ -30,6 +30,11 @@ public protocol MLNMapViewRepresentable: AnyObject {
                               direction: CLLocationDirection,
                               animated: Bool)
     @MainActor func setZoomLevel(_ zoomLevel: Double, animated: Bool)
+    @MainActor func cameraThatFitsShape(
+        _ shape: MLNShape,
+        direction: CLLocationDirection,
+        edgePadding: UIEdgeInsets
+    ) -> MLNMapCamera
     @MainActor func setVisibleCoordinateBounds(
         _ bounds: MLNCoordinateBounds,
         edgePadding: UIEdgeInsets,
