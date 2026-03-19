@@ -376,22 +376,35 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
 
     @MainActor
     private func simulateCameraUpdateAndWait(action: @escaping () -> Void) async throws {
-        let expectation = XCTestExpectation(description: "Camera update completed")
+        // Stage 1: Execute camera action and wait for continuation wiring.
+        action()
 
-        Task {
-            // Execute the provided camera action
-            action()
+        let pollIntervalNs = 100 * NSEC_PER_MSEC
+        let continuationTimeoutNs = 500 * NSEC_PER_MSEC
+        var waitedNs: UInt64 = 0
 
-            // Simulate the map becoming idle after a short delay
-            try await Task.sleep(nanoseconds: 100 * NSEC_PER_MSEC)
-            coordinator.cameraUpdateContinuation?.resume(returning: ())
-
-            // Wait for the update task to complete
-            _ = await coordinator.cameraUpdateTask?.value
-
-            expectation.fulfill()
+        while coordinator.cameraUpdateContinuation == nil && waitedNs < continuationTimeoutNs {
+            try await Task.sleep(nanoseconds: pollIntervalNs)
+            waitedNs += UInt64(pollIntervalNs)
         }
 
-        await fulfillment(of: [expectation], timeout: 1.0)
+        guard let continuation = coordinator.cameraUpdateContinuation else {
+            XCTFail("Stage 1 timeout: cameraUpdateContinuation was never set")
+            return
+        }
+
+        // Stage 2: Resume continuation and verify cameraUpdateTask completes.
+        continuation.resume(returning: ())
+
+        let taskCompletionExpectation = XCTestExpectation(
+            description: "Stage 2: cameraUpdateTask completes after continuation resume"
+        )
+
+        Task { @MainActor in
+            _ = await coordinator.cameraUpdateTask?.value
+            taskCompletionExpectation.fulfill()
+        }
+
+        await fulfillment(of: [taskCompletionExpectation], timeout: 1.0)
     }
 }
