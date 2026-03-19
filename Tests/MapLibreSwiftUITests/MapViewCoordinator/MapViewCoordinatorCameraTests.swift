@@ -1,4 +1,5 @@
 import CoreLocation
+import MapLibre
 import Mockable
 import XCTest
 @testable import MapLibreSwiftUI
@@ -267,7 +268,117 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
             .setCalled(1)
     }
 
-    // TODO: Test Rect & Showcase once we build it!
+    @MainActor func testShowcaseCameraUpdate() async throws {
+        let coordinates = [
+            CLLocationCoordinate2D(latitude: 45.0, longitude: -127.0),
+            CLLocationCoordinate2D(latitude: 45.2, longitude: -127.3),
+        ]
+        let shapeCollection = MLNShapeCollection(shapes: [MLNPolylineFeature(coordinates: coordinates)])
+        let contentInset = UIEdgeInsets(top: 11, left: 22, bottom: 33, right: 44)
+        let newCamera: MapViewCamera = .init(
+            state: .showcase(shapeCollection: shapeCollection, edgePadding: contentInset),
+            lastReasonForChange: .programmatic
+        )
+        let fittedCamera = MLNMapCamera()
+
+        given(maplibreMapView)
+            .cameraThatFitsShape(
+                .any,
+                direction: .any,
+                edgePadding: .any
+            )
+            .willReturn(fittedCamera)
+
+        given(maplibreMapView)
+            .setCamera(.any, animated: .any)
+            .willReturn()
+
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(
+                self.maplibreMapView, camera: newCamera, animated: false
+            )
+        }
+
+        verify(maplibreMapView)
+            .userTrackingMode(newValue: .value(.none))
+            .setCalled(1)
+
+        verify(maplibreMapView)
+            .minimumPitch(newValue: .value(0))
+            .setCalled(1)
+
+        verify(maplibreMapView)
+            .maximumPitch(newValue: .value(0))
+            .setCalled(1)
+
+        verify(maplibreMapView)
+            .direction(newValue: .value(0))
+            .setCalled(1)
+
+        verify(maplibreMapView)
+            .cameraThatFitsShape(
+                .any,
+                direction: .value(0),
+                edgePadding: .value(contentInset)
+            )
+            .called(1)
+
+        verify(maplibreMapView)
+            .setCamera(.any, animated: .value(false))
+            .called(1)
+
+        verify(maplibreMapView)
+            .setVisibleCoordinateBounds(
+                .any,
+                edgePadding: .any,
+                animated: .any,
+                completionHandler: .any
+            )
+            .called(0)
+    }
+
+    @MainActor func testShowcaseUnchangedCameraSkipsSecondUpdate() async throws {
+        let coordinates = [
+            CLLocationCoordinate2D(latitude: 45.0, longitude: -127.0),
+            CLLocationCoordinate2D(latitude: 45.2, longitude: -127.3),
+        ]
+        let shapeCollection = MLNShapeCollection(shapes: [MLNPolylineFeature(coordinates: coordinates)])
+        let camera: MapViewCamera = .init(
+            state: .showcase(shapeCollection: shapeCollection),
+            lastReasonForChange: .programmatic
+        )
+        let fittedCamera = MLNMapCamera()
+
+        given(maplibreMapView)
+            .cameraThatFitsShape(
+                .any,
+                direction: .any,
+                edgePadding: .any
+            )
+            .willReturn(fittedCamera)
+
+        given(maplibreMapView)
+            .setCamera(.any, animated: .any)
+            .willReturn()
+
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(
+                self.maplibreMapView, camera: camera, animated: false
+            )
+        }
+
+        coordinator.applyCameraChangeFromStateUpdate(
+            maplibreMapView, camera: camera, animated: false
+        )
+
+        verify(maplibreMapView)
+            .cameraThatFitsShape(.any, direction: .any, edgePadding: .any)
+            .called(1)
+
+        verify(maplibreMapView)
+            .setCamera(.any, animated: .any)
+            .called(1)
+    }
 
     @MainActor
     private func simulateCameraUpdateAndWait(action: @escaping () -> Void) async throws {
