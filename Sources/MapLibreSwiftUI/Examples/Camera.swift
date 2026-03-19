@@ -60,12 +60,9 @@ struct CameraShowcasePolylinePreview: View {
     }
 
     private var showcaseCamera: MapViewCamera {
-        .init(
-            state: .showcase(
-                shapeCollection: showcaseShapeCollection,
-                edgePadding: .init(top: 80, left: 24, bottom: 120, right: 24)
-            ),
-            lastReasonForChange: .programmatic
+        .showcase(
+            shapeCollection: showcaseShapeCollection,
+            edgePadding: .init(top: 80, left: 24, bottom: 120, right: 24)
         )
     }
 

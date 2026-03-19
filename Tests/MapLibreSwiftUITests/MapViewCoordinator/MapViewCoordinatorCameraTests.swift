@@ -275,10 +275,7 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
         ]
         let shapeCollection = MLNShapeCollection(shapes: [MLNPolylineFeature(coordinates: coordinates)])
         let contentInset = UIEdgeInsets(top: 11, left: 22, bottom: 33, right: 44)
-        let newCamera: MapViewCamera = .init(
-            state: .showcase(shapeCollection: shapeCollection, edgePadding: contentInset),
-            lastReasonForChange: .programmatic
-        )
+        let newCamera: MapViewCamera = .showcase(shapeCollection: shapeCollection, edgePadding: contentInset)
         let fittedCamera = MLNMapCamera()
 
         given(maplibreMapView)
@@ -343,10 +340,7 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
             CLLocationCoordinate2D(latitude: 45.2, longitude: -127.3),
         ]
         let shapeCollection = MLNShapeCollection(shapes: [MLNPolylineFeature(coordinates: coordinates)])
-        let camera: MapViewCamera = .init(
-            state: .showcase(shapeCollection: shapeCollection),
-            lastReasonForChange: .programmatic
-        )
+        let camera: MapViewCamera = .showcase(shapeCollection: shapeCollection)
         let fittedCamera = MLNMapCamera()
 
         given(maplibreMapView)

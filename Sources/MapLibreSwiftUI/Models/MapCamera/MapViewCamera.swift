@@ -140,6 +140,22 @@ public struct MapViewCamera: Hashable, Equatable, Sendable, CustomStringConverti
                       lastReasonForChange: .programmatic)
     }
 
+    /// Positions the camera to showcase a collection of shapes in the MapView.
+    ///
+    /// - Parameters:
+    ///   - shapeCollection: The shapes that should be visible.
+    ///   - edgePadding: The edge insets that should be applied before fitting the camera.
+    /// - Returns: The MapViewCamera representing the scenario.
+    public static func showcase(
+        shapeCollection: MLNShapeCollection,
+        edgePadding: UIEdgeInsets = .init(top: 20, left: 20, bottom: 20, right: 20)
+    ) -> MapViewCamera {
+        MapViewCamera(
+            state: .showcase(shapeCollection: shapeCollection, edgePadding: edgePadding),
+            lastReasonForChange: .programmatic
+        )
+    }
+
     public var description: String {
         "State: \(state) last: \((lastReasonForChange != nil) ? "\(lastReasonForChange!)" : "nil")"
     }
