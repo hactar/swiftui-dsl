@@ -249,10 +249,6 @@ MLNMapViewDelegate {
                     direction: direction
                 ):
                     mapView.userTrackingMode = .none
-                    // Apply pitch bounds before setting camera pitch so transitions from fixed-pitch
-                    // tracking modes can animate to a lower pitch without being clamped.
-                    mapView.minimumPitch = pitchRange.rangeValue.lowerBound
-                    mapView.maximumPitch = pitchRange.rangeValue.upperBound
 
                     if mapView.frame.size == .zero {
                         // On init, the mapView's frame is not set up yet, so manipulation via camera is broken,
@@ -267,7 +263,15 @@ MLNMapViewDelegate {
                         mapView.minimumPitch = pitch
                         mapView.maximumPitch = pitch
 
+                        // Keep the configured pitch range after the initialization workaround.
+                        mapView.minimumPitch = pitchRange.rangeValue.lowerBound
+                        mapView.maximumPitch = pitchRange.rangeValue.upperBound
                     } else {
+                        // Apply pitch bounds before setting camera pitch so transitions from fixed-pitch
+                        // tracking modes can animate to a lower pitch without being clamped.
+                        mapView.minimumPitch = pitchRange.rangeValue.lowerBound
+                        mapView.maximumPitch = pitchRange.rangeValue.upperBound
+
                         let camera = mapView.camera
                         camera.centerCoordinate = coordinate
                         camera.heading = direction
@@ -277,9 +281,6 @@ MLNMapViewDelegate {
                         camera.altitude = altitude
                         mapView.setCamera(camera, animated: animated)
                     }
-
-                    mapView.minimumPitch = pitchRange.rangeValue.lowerBound
-                    mapView.maximumPitch = pitchRange.rangeValue.upperBound
                 case let .trackingUserLocation(zoom: zoom, pitch: pitch, pitchRange: pitchRange, direction: direction):
                     if mapView.frame.size == .zero {
                         // On init, the mapView's frame is not set up yet, so manipulation via camera is broken,
