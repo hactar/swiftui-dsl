@@ -249,6 +249,10 @@ MLNMapViewDelegate {
                     direction: direction
                 ):
                     mapView.userTrackingMode = .none
+                    // Apply pitch bounds before setting camera pitch so transitions from fixed-pitch
+                    // tracking modes can animate to a lower pitch without being clamped.
+                    mapView.minimumPitch = pitchRange.rangeValue.lowerBound
+                    mapView.maximumPitch = pitchRange.rangeValue.upperBound
 
                     if mapView.frame.size == .zero {
                         // On init, the mapView's frame is not set up yet, so manipulation via camera is broken,
