@@ -1,5 +1,5 @@
 import Foundation
-import MapLibre
+@preconcurrency import MapLibre
 
 /// The CameraState is used to understand the current context of the MapView's camera.
 public enum CameraState: Hashable, Equatable, Sendable {
@@ -37,7 +37,10 @@ public enum CameraState: Hashable, Equatable, Sendable {
     )
 
     /// Showcasing GeoJSON, Polygons, etc.
-    case showcase(shapeCollection: MLNShapeCollection)
+    case showcase(
+        shapeCollection: MLNShapeCollection,
+        edgePadding: UIEdgeInsets = .init(top: 20, left: 20, bottom: 20, right: 20)
+    )
 }
 
 extension CameraState: CustomDebugStringConvertible {
@@ -59,8 +62,8 @@ extension CameraState: CustomDebugStringConvertible {
             "CameraState.trackingUserLocationWithCourse(zoom: \(zoom))"
         case let .rect(boundingBox: boundingBox, edgePadding: edgePadding):
             "CameraState.rect(northeast: \(boundingBox.ne), southwest: \(boundingBox.sw), edgePadding: \(edgePadding))"
-        case let .showcase(shapeCollection: shapeCollection):
-            "CameraState.showcase(shapeCollection: \(shapeCollection))"
+        case let .showcase(shapeCollection: shapeCollection, edgePadding: edgePadding):
+            "CameraState.showcase(shapeCollection: \(shapeCollection), edgePadding: \(edgePadding))"
         }
     }
 }

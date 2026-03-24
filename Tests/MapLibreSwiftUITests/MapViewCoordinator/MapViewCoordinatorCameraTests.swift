@@ -1,4 +1,5 @@
 import CoreLocation
+import MapLibre
 import Mockable
 import XCTest
 @testable import MapLibreSwiftUI
@@ -267,26 +268,143 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
             .setCalled(1)
     }
 
-    // TODO: Test Rect & Showcase once we build it!
+    @MainActor func testShowcaseCameraUpdate() async throws {
+        let coordinates = [
+            CLLocationCoordinate2D(latitude: 45.0, longitude: -127.0),
+            CLLocationCoordinate2D(latitude: 45.2, longitude: -127.3),
+        ]
+        let shapeCollection = MLNShapeCollection(shapes: [MLNPolylineFeature(coordinates: coordinates)])
+        let contentInset = UIEdgeInsets(top: 11, left: 22, bottom: 33, right: 44)
+        let newCamera: MapViewCamera = .showcase(shapeCollection: shapeCollection, edgePadding: contentInset)
+        let fittedCamera = MLNMapCamera()
+
+        given(maplibreMapView)
+            .cameraThatFitsShape(
+                .any,
+                direction: .any,
+                edgePadding: .any
+            )
+            .willReturn(fittedCamera)
+
+        given(maplibreMapView)
+            .setCamera(.any, animated: .any)
+            .willReturn()
+
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(
+                self.maplibreMapView, camera: newCamera, animated: false
+            )
+        }
+
+        verify(maplibreMapView)
+            .userTrackingMode(newValue: .value(.none))
+            .setCalled(1)
+
+        verify(maplibreMapView)
+            .minimumPitch(newValue: .value(0))
+            .setCalled(1)
+
+        verify(maplibreMapView)
+            .maximumPitch(newValue: .value(0))
+            .setCalled(1)
+
+        verify(maplibreMapView)
+            .direction(newValue: .value(0))
+            .setCalled(1)
+
+        verify(maplibreMapView)
+            .cameraThatFitsShape(
+                .any,
+                direction: .value(0),
+                edgePadding: .value(contentInset)
+            )
+            .called(1)
+
+        verify(maplibreMapView)
+            .setCamera(.any, animated: .value(false))
+            .called(1)
+
+        verify(maplibreMapView)
+            .setVisibleCoordinateBounds(
+                .any,
+                edgePadding: .any,
+                animated: .any,
+                completionHandler: .any
+            )
+            .called(0)
+    }
+
+    @MainActor func testShowcaseUnchangedCameraSkipsSecondUpdate() async throws {
+        let coordinates = [
+            CLLocationCoordinate2D(latitude: 45.0, longitude: -127.0),
+            CLLocationCoordinate2D(latitude: 45.2, longitude: -127.3),
+        ]
+        let shapeCollection = MLNShapeCollection(shapes: [MLNPolylineFeature(coordinates: coordinates)])
+        let camera: MapViewCamera = .showcase(shapeCollection: shapeCollection)
+        let fittedCamera = MLNMapCamera()
+
+        given(maplibreMapView)
+            .cameraThatFitsShape(
+                .any,
+                direction: .any,
+                edgePadding: .any
+            )
+            .willReturn(fittedCamera)
+
+        given(maplibreMapView)
+            .setCamera(.any, animated: .any)
+            .willReturn()
+
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(
+                self.maplibreMapView, camera: camera, animated: false
+            )
+        }
+
+        coordinator.applyCameraChangeFromStateUpdate(
+            maplibreMapView, camera: camera, animated: false
+        )
+
+        verify(maplibreMapView)
+            .cameraThatFitsShape(.any, direction: .any, edgePadding: .any)
+            .called(1)
+
+        verify(maplibreMapView)
+            .setCamera(.any, animated: .any)
+            .called(1)
+    }
 
     @MainActor
     private func simulateCameraUpdateAndWait(action: @escaping () -> Void) async throws {
-        let expectation = XCTestExpectation(description: "Camera update completed")
+        // Stage 1: Execute camera action and wait for continuation wiring.
+        action()
 
-        Task {
-            // Execute the provided camera action
-            action()
+        let pollIntervalNs = 100 * NSEC_PER_MSEC
+        let continuationTimeoutNs = 500 * NSEC_PER_MSEC
+        var waitedNs: UInt64 = 0
 
-            // Simulate the map becoming idle after a short delay
-            try await Task.sleep(nanoseconds: 100 * NSEC_PER_MSEC)
-            coordinator.cameraUpdateContinuation?.resume(returning: ())
-
-            // Wait for the update task to complete
-            _ = await coordinator.cameraUpdateTask?.value
-
-            expectation.fulfill()
+        while coordinator.cameraUpdateContinuation == nil && waitedNs < continuationTimeoutNs {
+            try await Task.sleep(nanoseconds: pollIntervalNs)
+            waitedNs += UInt64(pollIntervalNs)
         }
 
-        await fulfillment(of: [expectation], timeout: 1.0)
+        guard let continuation = coordinator.cameraUpdateContinuation else {
+            XCTFail("Stage 1 timeout: cameraUpdateContinuation was never set")
+            return
+        }
+
+        // Stage 2: Resume continuation and verify cameraUpdateTask completes.
+        continuation.resume(returning: ())
+
+        let taskCompletionExpectation = XCTestExpectation(
+            description: "Stage 2: cameraUpdateTask completes after continuation resume"
+        )
+
+        Task { @MainActor in
+            _ = await coordinator.cameraUpdateTask?.value
+            taskCompletionExpectation.fulfill()
+        }
+
+        await fulfillment(of: [taskCompletionExpectation], timeout: 1.0)
     }
 }
