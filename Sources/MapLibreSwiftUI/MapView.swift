@@ -119,6 +119,13 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
 
         applyModifiers(uiViewController, runUnsafe: true)
 
+        let currentLocationManager = uiViewController.mapView.locationManager as AnyObject?
+        let desiredLocationManager = locationManager as AnyObject?
+        if currentLocationManager !== desiredLocationManager {
+            uiViewController.mapView.locationManager = locationManager
+            uiViewController.mapView.locationManager = uiViewController.mapView.locationManager
+        }
+
         // FIXME: This should be a more selective update
         context.coordinator.updateStyleSource(styleSource, mapView: uiViewController.mapView)
         context.coordinator.updateLayers(mapView: uiViewController.mapView)
