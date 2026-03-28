@@ -127,7 +127,9 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
         if let desiredLocationManager = locationManager {
             let currentLocationManager = uiViewController.mapView.locationManager as AnyObject?
             let desiredLocationManagerObject = desiredLocationManager as AnyObject
-            if context.coordinator.isUsingDefaultLocationManager || currentLocationManager !== desiredLocationManagerObject {
+            if context.coordinator
+                .isUsingDefaultLocationManager || currentLocationManager !== desiredLocationManagerObject
+            {
                 uiViewController.mapView.locationManager = desiredLocationManager
                 uiViewController.mapView.locationManager = uiViewController.mapView.locationManager
                 context.coordinator.isUsingDefaultLocationManager = false
