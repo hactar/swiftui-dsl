@@ -54,6 +54,7 @@ MLNMapViewDelegate {
     var onViewProxyChanged: (MapViewProxy) -> Void
     var proxyUpdateMode: ProxyUpdateMode
     var managedGestureRecognizers: [UIGestureRecognizer] = []
+    var isUsingDefaultLocationManager = true
 
     /// Debounces rapid-fire tile error callbacks so the consumer receives one
     /// notification per burst rather than one per individual failing tile.

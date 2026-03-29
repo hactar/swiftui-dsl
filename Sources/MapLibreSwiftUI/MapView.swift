@@ -84,6 +84,7 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
 
         controller.mapView.locationManager = locationManager
         controller.mapView.locationManager = controller.mapView.locationManager
+        context.coordinator.isUsingDefaultLocationManager = locationManager == nil
 
         switch styleSource {
         case let .url(styleURL):
@@ -118,6 +119,26 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
         context.coordinator.parent = self
 
         applyModifiers(uiViewController, runUnsafe: true)
+
+        // `nil` here means "use MapLibre's built-in default manager", but
+        // `mapView.locationManager` will hold a concrete manager instance, not nil.
+        // We therefore track whether we are currently in "default manager mode"
+        // instead of relying on direct object identity against nil.
+        if let desiredLocationManager = locationManager {
+            let currentLocationManager = uiViewController.mapView.locationManager as AnyObject?
+            let desiredLocationManagerObject = desiredLocationManager as AnyObject
+            if context.coordinator
+                .isUsingDefaultLocationManager || currentLocationManager !== desiredLocationManagerObject
+            {
+                uiViewController.mapView.locationManager = desiredLocationManager
+                uiViewController.mapView.locationManager = uiViewController.mapView.locationManager
+                context.coordinator.isUsingDefaultLocationManager = false
+            }
+        } else if !context.coordinator.isUsingDefaultLocationManager {
+            uiViewController.mapView.locationManager = nil
+            uiViewController.mapView.locationManager = uiViewController.mapView.locationManager
+            context.coordinator.isUsingDefaultLocationManager = true
+        }
 
         // FIXME: This should be a more selective update
         context.coordinator.updateStyleSource(styleSource, mapView: uiViewController.mapView)
