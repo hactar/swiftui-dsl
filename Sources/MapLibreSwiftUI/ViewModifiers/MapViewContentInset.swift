@@ -12,7 +12,7 @@ import SwiftUI
 #endif
 
 @MainActor
-extension EnvironmentValues {
+public extension EnvironmentValues {
     var mapContentInset: UIEdgeInsets? {
         get { self[MapViewContentInsetKey.self] }
         set { self[MapViewContentInsetKey.self] = newValue }
