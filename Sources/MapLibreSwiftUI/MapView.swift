@@ -117,6 +117,7 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
 
     public func updateUIViewController(_ uiViewController: T, context: Context) {
         context.coordinator.parent = self
+        context.coordinator.registerGestureListener()
 
         applyModifiers(uiViewController, runUnsafe: true)
 

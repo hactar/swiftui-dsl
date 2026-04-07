@@ -55,6 +55,7 @@ MLNMapViewDelegate {
     var proxyUpdateMode: ProxyUpdateMode
     var managedGestureRecognizers: [UIGestureRecognizer] = []
     var isUsingDefaultLocationManager = true
+    private weak var registeredGestureManager: MapViewGestureManager?
 
     /// Debounces rapid-fire tile error callbacks so the consumer receives one
     /// notification per burst rather than one per individual failing tile.
@@ -91,6 +92,17 @@ MLNMapViewDelegate {
     /// This function sets up a callback on the registered `MapViewGestureManager`.
     /// Each time the callback emits a modified list of gestures, they are synced to the map view.
     func registerGestureListener() {
+        if registeredGestureManager === parent.gestureManager {
+            return
+        }
+
+        registeredGestureManager?.onGestureChange = nil
+        registeredGestureManager = parent.gestureManager
+
+        if let mapView {
+            syncGestures(on: mapView, gestures: parent.gestureManager.gestures)
+        }
+
         parent.gestureManager.onGestureChange = { [weak self] gestures in
             guard let self, let mapView else { return }
             syncGestures(on: mapView, gestures: gestures)
