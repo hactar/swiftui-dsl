@@ -133,16 +133,22 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
                 uiViewController.mapView.locationManager = desiredLocationManager
                 uiViewController.mapView.locationManager = uiViewController.mapView.locationManager
                 context.coordinator.isUsingDefaultLocationManager = false
+                startUpdatesOfSwappedLocationManager(uiViewController.mapView)
             }
         } else if !context.coordinator.isUsingDefaultLocationManager {
             uiViewController.mapView.locationManager = nil
             uiViewController.mapView.locationManager = uiViewController.mapView.locationManager
             context.coordinator.isUsingDefaultLocationManager = true
+            startUpdatesOfSwappedLocationManager(uiViewController.mapView)
         }
 
         // FIXME: This should be a more selective update
         context.coordinator.updateStyleSource(styleSource, mapView: uiViewController.mapView)
         context.coordinator.updateLayers(mapView: uiViewController.mapView)
+        context.coordinator.restoreGestures(
+            on: uiViewController.mapView,
+            gestures: gestureManager.gestures
+        )
         context.coordinator.onMapIdle = onMapIdle
         context.coordinator.onMapDidFinishRendering = onMapDidFinishRendering
         context.coordinator.onMapTileError = onMapTileError
@@ -156,6 +162,23 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
                 camera: camera,
                 animated: isStyleLoaded
             )
+        }
+    }
+
+    /// Starts location and heading updates on a location manager that replaced another one.
+    ///
+    /// Setting `MLNMapView.locationManager` stops the old manager but does not start the new one.
+    /// Remove this when MapLibre Native starts the new manager itself.
+    @MainActor private func startUpdatesOfSwappedLocationManager(_ mapView: MLNMapView) {
+        guard mapView.showsUserLocation else {
+            return
+        }
+
+        mapView.locationManager.startUpdatingLocation()
+
+        let showsPermanentHeading = mapView.showsUserHeadingIndicator && mapView.userTrackingMode != .followWithCourse
+        if showsPermanentHeading || mapView.userTrackingMode == .followWithHeading {
+            mapView.locationManager.startUpdatingHeading()
         }
     }
 
