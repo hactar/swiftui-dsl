@@ -64,6 +64,22 @@ Then, for each target add either the DSL (for just the DSL) or both (for the Swi
     .product(name: "MapLibreSwiftUI", package: "swiftui-dsl"),
 ```
 
+### Displaying the user location
+
+Use `mapUserLocationVisible` independently of the camera or annotation styling:
+
+```swift
+MapView(styleURL: styleURL, camera: $camera, locationManager: sharedLocationManager)
+    .mapUserLocationVisible(true, showsHeading: true, requestsAuthorization: false)
+```
+
+With `requestsAuthorization: false`, the host owns permission requests. The modifier
+uses the injected manager and does not create another location source. Omit the
+modifier to keep a custom host controller's existing settings. Use
+`mapUserAnnotationStyle` separately to customize the annotation's appearance.
+Hiding location also hides heading; Native camera tracking can enable location
+again, while hiding location ends native tracking.
+
 ### Simple example: polyline rendering
 
 Then, you can use it in a SwiftUI view body like this:
