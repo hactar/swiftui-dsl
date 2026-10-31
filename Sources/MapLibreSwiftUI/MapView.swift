@@ -25,6 +25,7 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
 
     @Binding var camera: MapViewCamera
     @Environment(\.mapUserAnnotationStyle) var annotationStyle
+    @Environment(\.mapUserLocationConfiguration) var userLocationConfiguration
     @Environment(\.mapControls) var controls
     @Environment(\.mapContentInset) var mapContentInset
     @Environment(\.mapClusterLayers) var clusteredLayers
@@ -85,6 +86,7 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
         controller.mapView.locationManager = locationManager
         controller.mapView.locationManager = controller.mapView.locationManager
         context.coordinator.isUsingDefaultLocationManager = locationManager == nil
+        userLocationConfiguration?.apply(to: controller.mapView)
 
         switch styleSource {
         case let .url(styleURL):
@@ -124,6 +126,7 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
         // `mapView.locationManager` will hold a concrete manager instance, not nil.
         // We therefore track whether we are currently in "default manager mode"
         // instead of relying on direct object identity against nil.
+        var didSwapLocationManager = false
         if let desiredLocationManager = locationManager {
             let currentLocationManager = uiViewController.mapView.locationManager as AnyObject?
             let desiredLocationManagerObject = desiredLocationManager as AnyObject
@@ -133,12 +136,19 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
                 uiViewController.mapView.locationManager = desiredLocationManager
                 uiViewController.mapView.locationManager = uiViewController.mapView.locationManager
                 context.coordinator.isUsingDefaultLocationManager = false
-                startUpdatesOfSwappedLocationManager(uiViewController.mapView)
+                didSwapLocationManager = true
             }
         } else if !context.coordinator.isUsingDefaultLocationManager {
             uiViewController.mapView.locationManager = nil
             uiViewController.mapView.locationManager = uiViewController.mapView.locationManager
             context.coordinator.isUsingDefaultLocationManager = true
+            didSwapLocationManager = true
+        }
+
+        let wasShowingUserLocation = uiViewController.mapView.showsUserLocation
+        userLocationConfiguration?.apply(to: uiViewController.mapView)
+        // Enabling location display already starts the newly installed manager.
+        if didSwapLocationManager && wasShowingUserLocation {
             startUpdatesOfSwappedLocationManager(uiViewController.mapView)
         }
 
