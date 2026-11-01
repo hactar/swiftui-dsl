@@ -392,14 +392,38 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
         }
 
         simulatedFrame = CGRect(x: 0, y: 0, width: 640, height: 320)
-        try await simulateCameraUpdateAndWait { self.coordinator.refitCameraAfterLayout(self.maplibreMapView) }
-        coordinator.refitCameraAfterLayout(maplibreMapView)
+        try await simulateCameraUpdateAndWait { self.coordinator.refitCameraAfterLayout(
+            self.maplibreMapView,
+            cameraUpdatesEnabled: true
+        ) }
+        coordinator.refitCameraAfterLayout(maplibreMapView, cameraUpdatesEnabled: true)
         verify(maplibreMapView).setCamera(.any, animated: .any).called(2)
 
         simulatedContentInset = UIEdgeInsets(top: 20, left: 200, bottom: 10, right: 10)
-        try await simulateCameraUpdateAndWait { self.coordinator.refitCameraAfterLayout(self.maplibreMapView) }
-        coordinator.refitCameraAfterLayout(maplibreMapView)
+        try await simulateCameraUpdateAndWait { self.coordinator.refitCameraAfterLayout(
+            self.maplibreMapView,
+            cameraUpdatesEnabled: true
+        ) }
+        coordinator.refitCameraAfterLayout(maplibreMapView, cameraUpdatesEnabled: true)
         verify(maplibreMapView).setCamera(.any, animated: .any).called(3)
+    }
+
+    @MainActor func testLayoutLeavesCameraAloneWhenUpdatesAreDisabled() async throws {
+        let shape = MLNShapeCollection(shapes: [MLNPointFeature(coordinate: .init(latitude: 45, longitude: -127))])
+        let camera = MapViewCamera.showcase(shapeCollection: shape)
+        coordinator.parent = try MapView(
+            styleURL: XCTUnwrap(URL(string: "https://maplibre.org")),
+            camera: .constant(camera)
+        )
+        simulatedFrame = CGRect(x: 0, y: 0, width: 320, height: 640)
+        given(maplibreMapView).cameraThatFitsShape(.any, direction: .any, edgePadding: .any).willReturn(MLNMapCamera())
+        given(maplibreMapView).setCamera(.any, animated: .any).willReturn()
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(self.maplibreMapView, camera: camera, animated: false)
+        }
+        simulatedFrame = CGRect(x: 0, y: 0, width: 640, height: 320)
+        coordinator.refitCameraAfterLayout(maplibreMapView, cameraUpdatesEnabled: false)
+        verify(maplibreMapView).setCamera(.any, animated: .any).called(1)
     }
 
     @MainActor func testBoundsRefitsAfterSizeChange() async throws {
@@ -423,8 +447,11 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
             self.coordinator.applyCameraChangeFromStateUpdate(self.maplibreMapView, camera: camera, animated: false)
         }
         simulatedFrame = CGRect(x: 0, y: 0, width: 640, height: 320)
-        try await simulateCameraUpdateAndWait { self.coordinator.refitCameraAfterLayout(self.maplibreMapView) }
-        coordinator.refitCameraAfterLayout(maplibreMapView)
+        try await simulateCameraUpdateAndWait { self.coordinator.refitCameraAfterLayout(
+            self.maplibreMapView,
+            cameraUpdatesEnabled: true
+        ) }
+        coordinator.refitCameraAfterLayout(maplibreMapView, cameraUpdatesEnabled: true)
         verify(maplibreMapView).setVisibleCoordinateBounds(
             .any,
             edgePadding: .any,
@@ -452,7 +479,7 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
             camera: .constant(pannedCamera)
         )
         simulatedFrame = CGRect(x: 0, y: 0, width: 640, height: 320)
-        coordinator.refitCameraAfterLayout(maplibreMapView)
+        coordinator.refitCameraAfterLayout(maplibreMapView, cameraUpdatesEnabled: true)
         verify(maplibreMapView).setCamera(.any, animated: .any).called(1)
     }
 
