@@ -37,6 +37,12 @@ MLNMapViewDelegate {
     // every update cycle so we can avoid unnecessary updates
     private var snapshotUserLayers: [StyleLayerDefinition] = []
     private var snapshotCamera: MapViewCamera?
+    private struct CameraViewport: Equatable {
+        let size: CGSize
+        let contentInset: UIEdgeInsets
+    }
+
+    private var snapshotCameraViewport: CameraViewport?
     private var snapshotStyleSource: MapStyleSource?
 
     /// An asyncronous task that applies the camera update and awaits the map to reach idle state.
@@ -212,6 +218,26 @@ MLNMapViewDelegate {
 
     // MARK: - Camera
 
+    private func fittedCameraViewport(_ mapView: MLNMapViewRepresentable, camera: MapViewCamera) -> CameraViewport? {
+        switch camera.state {
+        case .rect, .showcase:
+            CameraViewport(size: mapView.frame.size, contentInset: mapView.contentInset)
+        default:
+            nil
+        }
+    }
+
+    /// Native layout can finish after SwiftUI's update. Refit only a still-active
+    /// bounds/shape request; gestures and navigation camera updates retain control.
+    func refitCameraAfterLayout(_ mapView: MLNMapViewRepresentable) {
+        guard cameraUpdateTask == nil,
+              let snapshotCamera, snapshotCamera == parent.camera,
+              let viewport = fittedCameraViewport(mapView, camera: snapshotCamera),
+              viewport.size.width > 0, viewport.size.height > 0,
+              viewport != snapshotCameraViewport else { return }
+        applyCameraChangeFromStateUpdate(mapView, camera: snapshotCamera, animated: false)
+    }
+
     /// Apply a camera change based on the current @State of the camera.
     ///
     /// - Parameters:
@@ -223,12 +249,14 @@ MLNMapViewDelegate {
         camera: MapViewCamera,
         animated: Bool = true
     ) {
-        guard camera != snapshotCamera else {
-            // No action - camera has not changed.
+        let viewport = fittedCameraViewport(mapView, camera: camera)
+        guard camera != snapshotCamera || viewport != snapshotCameraViewport else {
+            // An unchanged fitted region still needs updating when its viewport changes.
             return
         }
 
         snapshotCamera = camera
+        snapshotCameraViewport = viewport
 
         // Cancel any existing camera update completion task.
         cameraUpdateTask?.cancel()
@@ -506,6 +534,7 @@ MLNMapViewDelegate {
         cameraUpdateContinuation?.resume()
         cameraUpdateContinuation = nil
         cameraUpdateTask = nil
+        refitCameraAfterLayout(mapView)
 
         let viewProxy = MapViewProxy(
             mapView: mapView,
@@ -516,6 +545,7 @@ MLNMapViewDelegate {
 
     @MainActor
     public func mapViewDidFinishRenderingMap(_ mapView: MLNMapView, fullyRendered: Bool) {
+        refitCameraAfterLayout(mapView)
         let viewProxy = MapViewProxy(
             mapView: mapView,
             lastReasonForChange: nil

@@ -6,13 +6,16 @@ import XCTest
 
 final class MapViewCoordinatorCameraTests: XCTestCase {
     var maplibreMapView: MockMLNMapViewRepresentable!
+    var simulatedFrame = CGRect.zero
+    var simulatedContentInset = UIEdgeInsets.zero
     var mapView: MapView<MLNMapViewController>!
     var coordinator: MapView<MLNMapViewController>.Coordinator!
 
     @MainActor
     override func setUp() async throws {
         maplibreMapView = MockMLNMapViewRepresentable()
-        given(maplibreMapView).frame.willReturn(.zero)
+        given(maplibreMapView).frame.willProduce { [unowned self] in simulatedFrame }
+        given(maplibreMapView).contentInset.willProduce { [unowned self] in simulatedContentInset }
         mapView = MapView(styleURL: URL(string: "https://maplibre.org")!)
         coordinator = MapView.Coordinator(
             parent: mapView,
@@ -374,6 +377,85 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
             .called(1)
     }
 
+    @MainActor func testShowcaseRefitsAfterSizeAndInsetChanges() async throws {
+        let shape = MLNShapeCollection(shapes: [MLNPointFeature(coordinate: .init(latitude: 45, longitude: -127))])
+        let camera = MapViewCamera.showcase(shapeCollection: shape)
+        coordinator.parent = try MapView(
+            styleURL: XCTUnwrap(URL(string: "https://maplibre.org")),
+            camera: .constant(camera)
+        )
+        simulatedFrame = CGRect(x: 0, y: 0, width: 320, height: 640)
+        given(maplibreMapView).cameraThatFitsShape(.any, direction: .any, edgePadding: .any).willReturn(MLNMapCamera())
+        given(maplibreMapView).setCamera(.any, animated: .any).willReturn()
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(self.maplibreMapView, camera: camera, animated: false)
+        }
+
+        simulatedFrame = CGRect(x: 0, y: 0, width: 640, height: 320)
+        try await simulateCameraUpdateAndWait { self.coordinator.refitCameraAfterLayout(self.maplibreMapView) }
+        coordinator.refitCameraAfterLayout(maplibreMapView)
+        verify(maplibreMapView).setCamera(.any, animated: .any).called(2)
+
+        simulatedContentInset = UIEdgeInsets(top: 20, left: 200, bottom: 10, right: 10)
+        try await simulateCameraUpdateAndWait { self.coordinator.refitCameraAfterLayout(self.maplibreMapView) }
+        coordinator.refitCameraAfterLayout(maplibreMapView)
+        verify(maplibreMapView).setCamera(.any, animated: .any).called(3)
+    }
+
+    @MainActor func testBoundsRefitsAfterSizeChange() async throws {
+        let bounds = MLNCoordinateBounds(
+            sw: .init(latitude: 45, longitude: -127),
+            ne: .init(latitude: 46, longitude: -126)
+        )
+        let camera = MapViewCamera.boundingBox(bounds)
+        coordinator.parent = try MapView(
+            styleURL: XCTUnwrap(URL(string: "https://maplibre.org")),
+            camera: .constant(camera)
+        )
+        simulatedFrame = CGRect(x: 0, y: 0, width: 320, height: 640)
+        given(maplibreMapView).setVisibleCoordinateBounds(
+            .any,
+            edgePadding: .any,
+            animated: .any,
+            completionHandler: .any
+        ).willReturn()
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(self.maplibreMapView, camera: camera, animated: false)
+        }
+        simulatedFrame = CGRect(x: 0, y: 0, width: 640, height: 320)
+        try await simulateCameraUpdateAndWait { self.coordinator.refitCameraAfterLayout(self.maplibreMapView) }
+        coordinator.refitCameraAfterLayout(maplibreMapView)
+        verify(maplibreMapView).setVisibleCoordinateBounds(
+            .any,
+            edgePadding: .any,
+            animated: .any,
+            completionHandler: .any
+        ).called(2)
+    }
+
+    @MainActor func testLayoutDoesNotReapplyFitAfterCameraIntentChanges() async throws {
+        let shape = MLNShapeCollection(shapes: [MLNPointFeature(coordinate: .init(latitude: 45, longitude: -127))])
+        let camera = MapViewCamera.showcase(shapeCollection: shape)
+        coordinator.parent = try MapView(
+            styleURL: XCTUnwrap(URL(string: "https://maplibre.org")),
+            camera: .constant(camera)
+        )
+        simulatedFrame = CGRect(x: 0, y: 0, width: 320, height: 640)
+        given(maplibreMapView).cameraThatFitsShape(.any, direction: .any, edgePadding: .any).willReturn(MLNMapCamera())
+        given(maplibreMapView).setCamera(.any, animated: .any).willReturn()
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(self.maplibreMapView, camera: camera, animated: false)
+        }
+        let pannedCamera = MapViewCamera.center(.init(latitude: 44, longitude: -125), zoom: 12, reason: .gesturePan)
+        coordinator.parent = try MapView(
+            styleURL: XCTUnwrap(URL(string: "https://maplibre.org")),
+            camera: .constant(pannedCamera)
+        )
+        simulatedFrame = CGRect(x: 0, y: 0, width: 640, height: 320)
+        coordinator.refitCameraAfterLayout(maplibreMapView)
+        verify(maplibreMapView).setCamera(.any, animated: .any).called(1)
+    }
+
     @MainActor
     private func simulateCameraUpdateAndWait(action: @escaping () -> Void) async throws {
         // Stage 1: Execute camera action and wait for continuation wiring.
@@ -395,6 +477,7 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
 
         // Stage 2: Resume continuation and verify cameraUpdateTask completes.
         continuation.resume(returning: ())
+        coordinator.cameraUpdateContinuation = nil
 
         let taskCompletionExpectation = XCTestExpectation(
             description: "Stage 2: cameraUpdateTask completes after continuation resume"
@@ -406,5 +489,6 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
         }
 
         await fulfillment(of: [taskCompletionExpectation], timeout: 1.0)
+        coordinator.cameraUpdateTask = nil
     }
 }
