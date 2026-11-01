@@ -229,8 +229,8 @@ MLNMapViewDelegate {
 
     /// Native layout can finish after SwiftUI's update. Refit only a still-active
     /// bounds/shape request; gestures and navigation camera updates retain control.
-    func refitCameraAfterLayout(_ mapView: MLNMapViewRepresentable) {
-        guard cameraUpdateTask == nil,
+    func refitCameraAfterLayout(_ mapView: MLNMapViewRepresentable, cameraUpdatesEnabled: Bool) {
+        guard cameraUpdatesEnabled, cameraUpdateTask == nil,
               let snapshotCamera, snapshotCamera == parent.camera,
               let viewport = fittedCameraViewport(mapView, camera: snapshotCamera),
               viewport.size.width > 0, viewport.size.height > 0,
@@ -534,7 +534,7 @@ MLNMapViewDelegate {
         cameraUpdateContinuation?.resume()
         cameraUpdateContinuation = nil
         cameraUpdateTask = nil
-        refitCameraAfterLayout(mapView)
+        refitCameraAfterLayout(mapView, cameraUpdatesEnabled: !parent.cameraDisabled)
 
         let viewProxy = MapViewProxy(
             mapView: mapView,
@@ -545,7 +545,7 @@ MLNMapViewDelegate {
 
     @MainActor
     public func mapViewDidFinishRenderingMap(_ mapView: MLNMapView, fullyRendered: Bool) {
-        refitCameraAfterLayout(mapView)
+        refitCameraAfterLayout(mapView, cameraUpdatesEnabled: !parent.cameraDisabled)
         let viewProxy = MapViewProxy(
             mapView: mapView,
             lastReasonForChange: nil
