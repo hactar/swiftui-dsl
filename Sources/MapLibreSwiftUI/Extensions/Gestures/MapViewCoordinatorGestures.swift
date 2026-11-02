@@ -60,6 +60,7 @@ extension MapViewCoordinator {
             action: #selector(captureGesture(_:))
         )
         gestureRecognizer.numberOfTapsRequired = numberOfTaps
+        gestureRecognizer.delegate = gestureControlDelegate
 
         if numberOfTaps == 1 {
             // If a user double taps to zoom via the built in gesture, a normal
@@ -87,6 +88,7 @@ extension MapViewCoordinator {
             action: #selector(captureGesture(_:))
         )
         gestureRecognizer.minimumPressDuration = minimumDuration
+        gestureRecognizer.delegate = gestureControlDelegate
 
         mapView.addGestureRecognizer(gestureRecognizer)
         managedGestureRecognizers.append(gestureRecognizer)
