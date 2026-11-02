@@ -222,7 +222,7 @@ MLNMapViewDelegate {
 
     private func fittedCameraViewport(_ mapView: MLNMapViewRepresentable, camera: MapViewCamera) -> CameraViewport? {
         switch camera.state {
-        case .rect, .showcase:
+        case .centered, .rect, .showcase:
             CameraViewport(size: mapView.frame.size, contentInset: mapView.contentInset)
         default:
             nil
@@ -230,7 +230,7 @@ MLNMapViewDelegate {
     }
 
     /// Native layout can finish after SwiftUI's update. Refit only a still-active
-    /// bounds/shape request; gestures and navigation camera updates retain control.
+    /// center/bounds/shape request; gestures and navigation camera updates retain control.
     func refitCameraAfterLayout(_ mapView: MLNMapViewRepresentable, cameraUpdatesEnabled: Bool) {
         guard cameraUpdatesEnabled, cameraUpdateTask == nil,
               let snapshotCamera, snapshotCamera == parent.camera,
@@ -257,7 +257,7 @@ MLNMapViewDelegate {
         let animated = animated && transaction?.disablesAnimations != true
         let viewport = fittedCameraViewport(mapView, camera: camera)
         guard camera != snapshotCamera || viewport != snapshotCameraViewport else {
-            // An unchanged fitted region still needs updating when its viewport changes.
+            // An unchanged camera still needs updating when its viewport changes.
             return
         }
 
