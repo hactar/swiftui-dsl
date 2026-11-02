@@ -483,6 +483,96 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
         verify(maplibreMapView).setCamera(.any, animated: .any).called(1)
     }
 
+    @MainActor func testCenteredCameraReappliesAfterInsetChange() async throws {
+        simulatedFrame = CGRect(x: 0, y: 0, width: 320, height: 640)
+        let target = CLLocationCoordinate2D(latitude: 45, longitude: -127)
+        let camera = MapViewCamera.center(target, zoom: 14, pitch: 30, direction: 90)
+        let nativeCamera = MLNMapCamera()
+        given(maplibreMapView).camera.willReturn(nativeCamera)
+        given(maplibreMapView).setCamera(.any, animated: .any).willReturn()
+
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(self.maplibreMapView, camera: camera, animated: false)
+        }
+        simulatedContentInset = UIEdgeInsets(top: 20, left: 0, bottom: 300, right: 0)
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(self.maplibreMapView, camera: camera, animated: false)
+        }
+
+        verify(maplibreMapView).setCamera(.any, animated: .value(false)).called(2)
+        XCTAssertEqual(nativeCamera.centerCoordinate, target)
+        XCTAssertEqual(nativeCamera.heading, 90)
+        XCTAssertEqual(nativeCamera.pitch, 30)
+        XCTAssertEqual(nativeCamera.altitude, MLNAltitudeForZoomLevel(14, 30, target.latitude, simulatedFrame.size))
+    }
+
+    @MainActor func testCenteredCameraRefitsAfterNativeLayout() async throws {
+        let camera = MapViewCamera.center(.init(latitude: 45, longitude: -127), zoom: 14)
+        coordinator.parent = try MapView(
+            styleURL: XCTUnwrap(URL(string: "https://maplibre.org")),
+            camera: .constant(camera)
+        )
+        simulatedFrame = CGRect(x: 0, y: 0, width: 320, height: 640)
+        let nativeCamera = MLNMapCamera()
+        given(maplibreMapView).camera.willReturn(nativeCamera)
+        given(maplibreMapView).setCamera(.any, animated: .any).willReturn()
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(self.maplibreMapView, camera: camera, animated: false)
+        }
+
+        simulatedFrame = CGRect(x: 0, y: 0, width: 640, height: 320)
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.refitCameraAfterLayout(self.maplibreMapView, cameraUpdatesEnabled: true)
+        }
+        coordinator.refitCameraAfterLayout(maplibreMapView, cameraUpdatesEnabled: true)
+
+        verify(maplibreMapView).setCamera(.any, animated: .value(false)).called(2)
+        XCTAssertEqual(nativeCamera.altitude, MLNAltitudeForZoomLevel(14, 0, 45, simulatedFrame.size))
+    }
+
+    @MainActor func testCenteredLayoutRespectsDisabledUpdatesAndNewerGestureIntent() async throws {
+        let camera = MapViewCamera.center(.init(latitude: 45, longitude: -127), zoom: 14)
+        coordinator.parent = try MapView(
+            styleURL: XCTUnwrap(URL(string: "https://maplibre.org")),
+            camera: .constant(camera)
+        )
+        simulatedFrame = CGRect(x: 0, y: 0, width: 320, height: 640)
+        given(maplibreMapView).camera.willReturn(MLNMapCamera())
+        given(maplibreMapView).setCamera(.any, animated: .any).willReturn()
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(self.maplibreMapView, camera: camera, animated: false)
+        }
+
+        simulatedContentInset = UIEdgeInsets(top: 0, left: 0, bottom: 300, right: 0)
+        coordinator.refitCameraAfterLayout(maplibreMapView, cameraUpdatesEnabled: false)
+        let pannedCamera = MapViewCamera.center(.init(latitude: 44, longitude: -125), zoom: 13, reason: .gesturePan)
+        coordinator.parent = try MapView(
+            styleURL: XCTUnwrap(URL(string: "https://maplibre.org")),
+            camera: .constant(pannedCamera)
+        )
+        coordinator.refitCameraAfterLayout(maplibreMapView, cameraUpdatesEnabled: true)
+
+        verify(maplibreMapView).setCamera(.any, animated: .any).called(1)
+    }
+
+    @MainActor func testLayoutDoesNotReapplyLocationTracking() async throws {
+        let camera = MapViewCamera.trackUserLocation(zoom: 14)
+        coordinator.parent = try MapView(
+            styleURL: XCTUnwrap(URL(string: "https://maplibre.org")),
+            camera: .constant(camera)
+        )
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(self.maplibreMapView, camera: camera, animated: false)
+        }
+
+        simulatedFrame = CGRect(x: 0, y: 0, width: 320, height: 640)
+        simulatedContentInset = UIEdgeInsets(top: 0, left: 0, bottom: 300, right: 0)
+        coordinator.refitCameraAfterLayout(maplibreMapView, cameraUpdatesEnabled: true)
+
+        verify(maplibreMapView).userTrackingMode(newValue: .value(.follow)).setCalled(1)
+        verify(maplibreMapView).setUserTrackingMode(.any, animated: .any, completionHandler: .any).called(0)
+    }
+
     @MainActor
     private func simulateCameraUpdateAndWait(action: @escaping () -> Void) async throws {
         // Stage 1: Execute camera action and wait for continuation wiring.
