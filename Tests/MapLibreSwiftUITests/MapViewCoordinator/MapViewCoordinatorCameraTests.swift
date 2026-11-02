@@ -519,6 +519,55 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
         verify(maplibreMapView).setCenter(.any, zoomLevel: .any, direction: .any, animated: .value(false)).called(0)
     }
 
+    @MainActor func testSupersededCameraTaskDoesNotApplyItsOldViewport() async throws {
+        given(maplibreMapView).setCenter(.any, zoomLevel: .any, direction: .any, animated: .any).willReturn()
+        let obsolete = CLLocationCoordinate2D(latitude: 45, longitude: -127)
+        let current = CLLocationCoordinate2D(latitude: 46, longitude: -126)
+
+        // Both binding changes arrive before the main actor executes either
+        // native update. Only the still-current request may move the map.
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(
+                self.maplibreMapView, camera: .center(obsolete, zoom: 12), animated: false
+            )
+            self.coordinator.applyCameraChangeFromStateUpdate(
+                self.maplibreMapView, camera: .center(current, zoom: 13), animated: false
+            )
+        }
+
+        verify(maplibreMapView).setCenter(.value(obsolete), zoomLevel: .any, direction: .any, animated: .any).called(0)
+        verify(maplibreMapView).setCenter(
+            .value(current),
+            zoomLevel: .value(13),
+            direction: .any,
+            animated: .value(false)
+        ).called(1)
+    }
+
+    @MainActor func testSupersededGestureTaskCannotOverwriteANewerBinding() async throws {
+        given(maplibreMapView).setCenter(.any, zoomLevel: .any, direction: .any, animated: .any).willReturn()
+        given(maplibreMapView).centerCoordinate.willReturn(.init(latitude: 45, longitude: -127))
+        given(maplibreMapView).zoomLevel.willReturn(12)
+        given(maplibreMapView).direction.willReturn(0)
+        given(maplibreMapView).minimumPitch.willReturn(0)
+        given(maplibreMapView).maximumPitch.willReturn(60)
+        given(maplibreMapView).camera.willReturn(MLNMapCamera())
+        var boundCamera = MapViewCamera.default()
+        let current = MapViewCamera.center(.init(latitude: 46, longitude: -126), zoom: 13, reason: .programmatic)
+        coordinator.parent = try MapView(
+            styleURL: XCTUnwrap(URL(string: "https://maplibre.org")),
+            camera: Binding(get: { boundCamera }, set: { boundCamera = $0 })
+        )
+
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromGesture(self.maplibreMapView, reason: .gesturePan)
+            boundCamera = current
+            self.coordinator.applyCameraChangeFromStateUpdate(self.maplibreMapView, camera: current, animated: false)
+        }
+
+        XCTAssertEqual(boundCamera, current)
+    }
+
     @MainActor
     private func simulateCameraUpdateAndWait(action: @escaping () -> Void) async throws {
         // Stage 1: Execute camera action and wait for continuation wiring.
