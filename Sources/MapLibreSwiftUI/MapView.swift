@@ -173,7 +173,8 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
             context.coordinator.applyCameraChangeFromStateUpdate(
                 uiViewController.mapView,
                 camera: camera,
-                animated: isStyleLoaded
+                animated: isStyleLoaded,
+                transaction: context.transaction
             )
         }
     }

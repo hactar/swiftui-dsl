@@ -1,6 +1,7 @@
 import CoreLocation
 import MapLibre
 import Mockable
+import SwiftUI
 import XCTest
 @testable import MapLibreSwiftUI
 
@@ -481,6 +482,41 @@ final class MapViewCoordinatorCameraTests: XCTestCase {
         simulatedFrame = CGRect(x: 0, y: 0, width: 640, height: 320)
         coordinator.refitCameraAfterLayout(maplibreMapView, cameraUpdatesEnabled: true)
         verify(maplibreMapView).setCamera(.any, animated: .any).called(1)
+    }
+
+    @MainActor func testDisabledTransactionAppliesImmediateCameraUpdate() async throws {
+        given(maplibreMapView).setCenter(.any, zoomLevel: .any, direction: .any, animated: .any).willReturn()
+        var disabledTransaction = Transaction()
+        disabledTransaction.disablesAnimations = true
+        let transaction = disabledTransaction
+
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(
+                self.maplibreMapView,
+                camera: .center(.init(latitude: 45, longitude: -127), zoom: 12),
+                animated: true,
+                transaction: transaction
+            )
+        }
+
+        verify(maplibreMapView).setCenter(.any, zoomLevel: .any, direction: .any, animated: .value(false)).called(1)
+        verify(maplibreMapView).setCenter(.any, zoomLevel: .any, direction: .any, animated: .value(true)).called(0)
+    }
+
+    @MainActor func testOrdinaryTransactionRetainsCameraAnimation() async throws {
+        given(maplibreMapView).setCenter(.any, zoomLevel: .any, direction: .any, animated: .any).willReturn()
+
+        try await simulateCameraUpdateAndWait {
+            self.coordinator.applyCameraChangeFromStateUpdate(
+                self.maplibreMapView,
+                camera: .center(.init(latitude: 45, longitude: -127), zoom: 12),
+                animated: true,
+                transaction: Transaction()
+            )
+        }
+
+        verify(maplibreMapView).setCenter(.any, zoomLevel: .any, direction: .any, animated: .value(true)).called(1)
+        verify(maplibreMapView).setCenter(.any, zoomLevel: .any, direction: .any, animated: .value(false)).called(0)
     }
 
     @MainActor

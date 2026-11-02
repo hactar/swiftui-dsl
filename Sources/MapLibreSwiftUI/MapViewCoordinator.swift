@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import MapLibre
 import MapLibreSwiftDSL
+import SwiftUI
 
 extension MLNCameraChangeReason: @retroactive CustomStringConvertible {
     private static let descriptions: [(Self, String)] = [
@@ -247,8 +248,12 @@ MLNMapViewDelegate {
     @MainActor func applyCameraChangeFromStateUpdate(
         _ mapView: MLNMapViewRepresentable,
         camera: MapViewCamera,
-        animated: Bool = true
+        animated: Bool = true,
+        transaction: Transaction? = nil
     ) {
+        // Continuous interactions can explicitly request immediate camera updates
+        // using SwiftUI's existing transaction, without another camera API.
+        let animated = animated && transaction?.disablesAnimations != true
         let viewport = fittedCameraViewport(mapView, camera: camera)
         guard camera != snapshotCamera || viewport != snapshotCameraViewport else {
             // An unchanged fitted region still needs updating when its viewport changes.
