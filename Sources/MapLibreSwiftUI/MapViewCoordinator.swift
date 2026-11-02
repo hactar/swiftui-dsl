@@ -234,6 +234,9 @@ MLNMapViewDelegate {
         cameraUpdateTask?.cancel()
 
         cameraUpdateTask = Task { @MainActor in
+            // A newer request may cancel this task before execution. Do not
+            // apply an obsolete native viewport or gesture binding update.
+            guard !Task.isCancelled else { return }
             await withCheckedContinuation { continuation in
                 // Clean up the continuation if it was already set.
                 cameraUpdateContinuation?.resume()
@@ -411,6 +414,9 @@ MLNMapViewDelegate {
         }
 
         cameraUpdateTask = Task { @MainActor in
+            // A newer request may cancel this task before execution. Do not
+            // apply an obsolete native viewport or gesture binding update.
+            guard !Task.isCancelled else { return }
             await withCheckedContinuation { continuation in
                 // Store the continuation to be resumed in mapViewDidBecomeIdle
                 cameraUpdateContinuation = continuation
