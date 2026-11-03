@@ -205,8 +205,8 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
     }
 }
 
+@MainActor
 public extension MapView where T == MLNMapViewController {
-    @MainActor
     init(
         styleURL: URL,
         camera: Binding<MapViewCamera> = .constant(.default()),
