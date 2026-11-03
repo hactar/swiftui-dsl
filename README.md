@@ -77,8 +77,9 @@ With `requestsAuthorization: false`, the host owns permission requests. The modi
 uses the injected manager and does not create another location source. Omit the
 modifier to keep a custom host controller's existing settings. Use
 `mapUserAnnotationStyle` separately to customize the annotation's appearance.
-Hiding location also hides heading; Native camera tracking can enable location
-again, while hiding location ends native tracking.
+Hiding location also hides its heading indicator and suspends native tracking.
+When location is shown again, the map honors the current camera request if the
+DSL is managing the camera.
 
 ### Simple example: polyline rendering
 

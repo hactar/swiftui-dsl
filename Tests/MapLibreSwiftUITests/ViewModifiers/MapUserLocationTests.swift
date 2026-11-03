@@ -9,7 +9,7 @@ final class MapUserLocationTests: XCTestCase {
         let camera = MapViewCamera.trackUserLocation()
         let map = MLNMapView()
         map.locationManager = RecordingLocationManager()
-        let coordinator = try makeCoordinator(camera: camera)
+        let coordinator = try makeCoordinator(camera: .constant(camera))
         map.delegate = coordinator
 
         coordinator.updateUserLocation(
@@ -35,6 +35,43 @@ final class MapUserLocationTests: XCTestCase {
         )
         await applyFollowCamera(camera, on: map, coordinator: coordinator)
         XCTAssertEqual(map.userTrackingMode, .follow)
+    }
+
+    @MainActor func testHidingLocationBeforeQueuedFollowAllowsNextPanToUpdateCamera() async throws {
+        let camera = MapViewCamera.trackUserLocation()
+        let map = MLNMapView()
+        map.locationManager = RecordingLocationManager()
+        let panUpdatedCamera = expectation(description: "Pan updates the bound camera")
+        let coordinator = try makeCoordinator(camera: Binding(
+            get: { camera },
+            set: { newCamera in
+                guard case .centered = newCamera.state else {
+                    XCTFail("Expected a centered camera after panning")
+                    return
+                }
+                panUpdatedCamera.fulfill()
+            }
+        ))
+        coordinator.updateUserLocation(
+            on: map,
+            configuration: locationConfiguration(true),
+            didInstallLocationManager: false
+        )
+
+        coordinator.applyCameraChangeFromStateUpdate(map, camera: camera, animated: false)
+        let followTask = try XCTUnwrap(coordinator.cameraUpdateTask)
+        coordinator.updateUserLocation(
+            on: map,
+            configuration: locationConfiguration(false),
+            didInstallLocationManager: false
+        )
+        await followTask.value
+        XCTAssertFalse(map.showsUserLocation)
+        XCTAssertEqual(map.userTrackingMode, .none)
+
+        coordinator.applyCameraChangeFromGesture(map, reason: .gesturePan)
+        await fulfillment(of: [panUpdatedCamera], timeout: 1)
+        coordinator.mapViewDidBecomeIdle(map)
     }
 
     @MainActor func testHidingLocationDefersTrackingCallback() async throws {
@@ -95,13 +132,13 @@ final class MapUserLocationTests: XCTestCase {
         XCTAssertEqual(manager.locationStarts, 1)
     }
 
-    @MainActor private func makeCoordinator(camera: MapViewCamera = .default()) throws
+    @MainActor private func makeCoordinator(camera: Binding<MapViewCamera> = .constant(.default())) throws
         -> MapViewCoordinator<MLNMapViewController>
     {
         try MapViewCoordinator(
             parent: MapView(
                 styleURL: XCTUnwrap(URL(string: "https://maplibre.org")),
-                camera: .constant(camera)
+                camera: camera
             ),
             onGesture: { _, _ in },
             onViewProxyChanged: { _ in },
