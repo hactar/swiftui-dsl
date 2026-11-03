@@ -238,6 +238,7 @@ MLNMapViewDelegate {
         isUserLocationHidden = hidesUserLocation
 
         let wasShowingUserLocation = mapView.showsUserLocation
+        let wasShowingHeading = mapView.showsUserHeadingIndicator
         isApplyingUserLocationConfiguration = true
         defer { isApplyingUserLocationConfiguration = false }
         configuration?.apply(to: mapView)
@@ -247,7 +248,10 @@ MLNMapViewDelegate {
         if didInstallLocationManager, wasShowingUserLocation, mapView.showsUserLocation {
             mapView.locationManager.startUpdatingLocation()
             let mode = mapView.userTrackingMode
-            if mode == .followWithHeading || (mapView.showsUserHeadingIndicator && mode != .followWithCourse) {
+            // Native revalidates heading updates when the indicator changes.
+            if wasShowingHeading == mapView.showsUserHeadingIndicator,
+               mode == .followWithHeading || (mapView.showsUserHeadingIndicator && mode != .followWithCourse)
+            {
                 mapView.locationManager.startUpdatingHeading()
             }
         }

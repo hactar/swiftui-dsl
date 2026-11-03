@@ -114,22 +114,29 @@ final class MapUserLocationTests: XCTestCase {
         map.locationManager = manager
         map.locationManager = map.locationManager
         let coordinator = try makeCoordinator()
+        let configuration = MapUserLocationConfiguration(
+            isVisible: true,
+            showsHeading: true,
+            requestsAuthorization: false
+        )
 
         coordinator.updateUserLocation(
             on: map,
-            configuration: locationConfiguration(true),
+            configuration: configuration,
             didInstallLocationManager: true
         )
 
         XCTAssertTrue(map.locationManager === manager)
         XCTAssertEqual(manager.locationStarts, 1)
+        XCTAssertEqual(manager.headingStarts, 1)
         XCTAssertEqual(manager.authorizationRequests, 0)
         coordinator.updateUserLocation(
             on: map,
-            configuration: locationConfiguration(true),
+            configuration: configuration,
             didInstallLocationManager: false
         )
         XCTAssertEqual(manager.locationStarts, 1)
+        XCTAssertEqual(manager.headingStarts, 1)
     }
 
     @MainActor private func makeCoordinator(camera: Binding<MapViewCamera> = .constant(.default())) throws
