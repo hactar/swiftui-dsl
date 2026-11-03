@@ -246,13 +246,17 @@ MLNMapViewDelegate {
         // Native starts the manager when visibility changes from false to true.
         // Installing a manager while the map stays visible needs an explicit restart.
         if didInstallLocationManager, wasShowingUserLocation, mapView.showsUserLocation {
-            mapView.locationManager.startUpdatingLocation()
+            let manager: any MLNLocationManager = mapView.locationManager
+            if mapView.shouldRequestAuthorizationToUseLocationServices, manager.authorizationStatus == .notDetermined {
+                manager.requestWhenInUseAuthorization()
+            }
+            manager.startUpdatingLocation()
             let mode = mapView.userTrackingMode
             // Native revalidates heading updates when the indicator changes.
             if wasShowingHeading == mapView.showsUserHeadingIndicator,
                mode == .followWithHeading || (mapView.showsUserHeadingIndicator && mode != .followWithCourse)
             {
-                mapView.locationManager.startUpdatingHeading()
+                manager.startUpdatingHeading()
             }
         }
     }
