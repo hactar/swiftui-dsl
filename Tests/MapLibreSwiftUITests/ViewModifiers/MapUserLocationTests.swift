@@ -1,9 +1,135 @@
 import CoreLocation
 import MapLibre
+import SwiftUI
 import XCTest
 @testable import MapLibreSwiftUI
 
 final class MapUserLocationTests: XCTestCase {
+    @MainActor func testShowingLocationReappliesUnchangedFollowCamera() async throws {
+        let camera = MapViewCamera.trackUserLocation()
+        let map = MLNMapView()
+        map.locationManager = RecordingLocationManager()
+        let coordinator = try makeCoordinator(camera: camera)
+        map.delegate = coordinator
+
+        coordinator.updateUserLocation(
+            on: map,
+            configuration: locationConfiguration(true),
+            didInstallLocationManager: false
+        )
+        await applyFollowCamera(camera, on: map, coordinator: coordinator)
+
+        coordinator.updateUserLocation(
+            on: map,
+            configuration: locationConfiguration(false),
+            didInstallLocationManager: false
+        )
+        coordinator.applyCameraChangeFromStateUpdate(map, camera: camera, animated: false)
+        XCTAssertFalse(map.showsUserLocation)
+        XCTAssertEqual(map.userTrackingMode, .none)
+
+        coordinator.updateUserLocation(
+            on: map,
+            configuration: locationConfiguration(true),
+            didInstallLocationManager: false
+        )
+        await applyFollowCamera(camera, on: map, coordinator: coordinator)
+        XCTAssertEqual(map.userTrackingMode, .follow)
+    }
+
+    @MainActor func testHidingLocationDefersTrackingCallback() async throws {
+        let map = MLNMapView()
+        map.locationManager = RecordingLocationManager()
+        let coordinator = try makeCoordinator()
+        map.delegate = coordinator
+        coordinator.updateUserLocation(
+            on: map,
+            configuration: locationConfiguration(true),
+            didInstallLocationManager: false
+        )
+        map.userTrackingMode = .follow
+        XCTAssertEqual(map.userTrackingMode, .follow)
+
+        let delivered = expectation(description: "Tracking callback after the visibility update")
+        var isUpdating = true
+        coordinator.onUserTrackingModeChange = { mode, _ in
+            XCTAssertFalse(isUpdating)
+            XCTAssertEqual(mode, .none)
+            delivered.fulfill()
+        }
+
+        coordinator.updateUserLocation(
+            on: map,
+            configuration: locationConfiguration(false),
+            didInstallLocationManager: false
+        )
+        isUpdating = false
+        XCTAssertEqual(map.userTrackingMode, .none)
+        await fulfillment(of: [delivered], timeout: 1)
+        coordinator.onUserTrackingModeChange = nil
+    }
+
+    @MainActor func testInstallingManagerWhileLocationStaysVisibleRestartsItOnce() throws {
+        let map = MLNMapView()
+        map.locationManager = RecordingLocationManager()
+        locationConfiguration(true).apply(to: map)
+        let manager = RecordingLocationManager()
+        map.locationManager = manager
+        map.locationManager = map.locationManager
+        let coordinator = try makeCoordinator()
+
+        coordinator.updateUserLocation(
+            on: map,
+            configuration: locationConfiguration(true),
+            didInstallLocationManager: true
+        )
+
+        XCTAssertTrue(map.locationManager === manager)
+        XCTAssertEqual(manager.locationStarts, 1)
+        XCTAssertEqual(manager.authorizationRequests, 0)
+        coordinator.updateUserLocation(
+            on: map,
+            configuration: locationConfiguration(true),
+            didInstallLocationManager: false
+        )
+        XCTAssertEqual(manager.locationStarts, 1)
+    }
+
+    @MainActor private func makeCoordinator(camera: MapViewCamera = .default()) throws
+        -> MapViewCoordinator<MLNMapViewController>
+    {
+        try MapViewCoordinator(
+            parent: MapView(
+                styleURL: XCTUnwrap(URL(string: "https://maplibre.org")),
+                camera: .constant(camera)
+            ),
+            onGesture: { _, _ in },
+            onViewProxyChanged: { _ in },
+            proxyUpdateMode: .onFinish
+        )
+    }
+
+    @MainActor private func applyFollowCamera(
+        _ camera: MapViewCamera,
+        on map: MLNMapView,
+        coordinator: MapViewCoordinator<MLNMapViewController>
+    ) async {
+        let followed = expectation(description: "Native map starts following")
+        coordinator.onUserTrackingModeChange = { mode, _ in
+            if mode == .follow {
+                followed.fulfill()
+            }
+        }
+        coordinator.applyCameraChangeFromStateUpdate(map, camera: camera, animated: false)
+        await fulfillment(of: [followed], timeout: 1)
+        coordinator.onUserTrackingModeChange = nil
+        coordinator.mapViewDidBecomeIdle(map)
+    }
+
+    private func locationConfiguration(_ isVisible: Bool) -> MapUserLocationConfiguration {
+        MapUserLocationConfiguration(isVisible: isVisible, showsHeading: false, requestsAuthorization: false)
+    }
+
     @MainActor func testLocationPresentationUsesInstalledManagerWithoutRequestingPermission() {
         let manager = RecordingLocationManager()
         let map = MLNMapView()

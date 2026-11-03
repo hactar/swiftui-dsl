@@ -65,6 +65,8 @@ MLNMapViewDelegate {
     var managedGestureRecognizers: [UIGestureRecognizer] = []
     let gestureControlDelegate = MapGestureControlDelegate()
     var isUsingDefaultLocationManager = true
+    private var isUserLocationHidden = false
+    private var isApplyingUserLocationConfiguration = false
 
     /// Debounces rapid-fire tile error callbacks so the consumer receives one
     /// notification per burst rather than one per individual failing tile.
@@ -218,6 +220,35 @@ MLNMapViewDelegate {
         }
     }
 
+    func updateUserLocation(
+        on mapView: MLNMapView,
+        configuration: MapUserLocationConfiguration?,
+        didInstallLocationManager: Bool
+    ) {
+        let hidesUserLocation = configuration?.isVisible == false
+        if hidesUserLocation, !isUserLocationHidden, snapshotCamera?.state.tracksUserLocation == true {
+            // Native cancels tracking on hide. Reapply the host's request when it becomes visible again.
+            snapshotCamera = nil
+            cameraUpdateTask?.cancel()
+        }
+        isUserLocationHidden = hidesUserLocation
+
+        let wasShowingUserLocation = mapView.showsUserLocation
+        isApplyingUserLocationConfiguration = true
+        defer { isApplyingUserLocationConfiguration = false }
+        configuration?.apply(to: mapView)
+
+        // Native starts the manager when visibility changes from false to true.
+        // Installing a manager while the map stays visible needs an explicit restart.
+        if didInstallLocationManager, wasShowingUserLocation, mapView.showsUserLocation {
+            mapView.locationManager.startUpdatingLocation()
+            let mode = mapView.userTrackingMode
+            if mode == .followWithHeading || (mapView.showsUserHeadingIndicator && mode != .followWithCourse) {
+                mapView.locationManager.startUpdatingHeading()
+            }
+        }
+    }
+
     // MARK: - Camera
 
     private func fittedCameraViewport(_ mapView: MLNMapViewRepresentable, camera: MapViewCamera) -> CameraViewport? {
@@ -256,7 +287,8 @@ MLNMapViewDelegate {
         // using SwiftUI's existing transaction, without another camera API.
         let animated = animated && transaction?.disablesAnimations != true
         let viewport = fittedCameraViewport(mapView, camera: camera)
-        guard camera != snapshotCamera || viewport != snapshotCameraViewport else {
+        guard !(isUserLocationHidden && camera.state.tracksUserLocation),
+              camera != snapshotCamera || viewport != snapshotCameraViewport else {
             // An unchanged camera still needs updating when its viewport changes.
             return
         }
@@ -270,7 +302,8 @@ MLNMapViewDelegate {
         cameraUpdateTask = Task { @MainActor in
             // A newer request may cancel this task before execution. Do not
             // apply an obsolete native viewport or gesture binding update.
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled,
+                  !(camera.state.tracksUserLocation && isUserLocationHidden) else { return }
             await withCheckedContinuation { continuation in
                 // Clean up the continuation if it was already set.
                 cameraUpdateContinuation?.resume()
@@ -583,7 +616,13 @@ MLNMapViewDelegate {
 
     @MainActor
     public func mapView(_: MLNMapView, didChange mode: MLNUserTrackingMode, animated: Bool) {
-        onUserTrackingModeChange?(mode, animated)
+        if isApplyingUserLocationConfiguration {
+            Task { @MainActor [weak self] in
+                self?.onUserTrackingModeChange?(mode, animated)
+            }
+        } else {
+            onUserTrackingModeChange?(mode, animated)
+        }
     }
 
     // MARK: MapViewProxy
@@ -606,4 +645,15 @@ public enum ProxyUpdateMode {
     case realtime
     /// Default. Causes `MapViewProxy` to be only be updated when a map view scroll or animation completes.
     case onFinish
+}
+
+private extension CameraState {
+    var tracksUserLocation: Bool {
+        switch self {
+        case .trackingUserLocation, .trackingUserLocationWithHeading, .trackingUserLocationWithCourse:
+            true
+        case .centered, .rect, .showcase:
+            false
+        }
+    }
 }
