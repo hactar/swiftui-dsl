@@ -163,6 +163,51 @@ final class MapUserLocationTests: XCTestCase {
         }
     }
 
+    @MainActor func testVisibleManagerSwapWithoutModifierLeavesAuthorizationToHost() throws {
+        let map = MLNMapView()
+        map.locationManager = RecordingLocationManager()
+        locationConfiguration(true).apply(to: map)
+        map.shouldRequestAuthorizationToUseLocationServices = true
+        let manager = RecordingLocationManager()
+        manager.authorizationStatus = .notDetermined
+        manager.requestWhenInUseAuthorization()
+        map.locationManager = manager
+
+        let coordinator = try makeCoordinator()
+        coordinator.updateUserLocation(on: map, configuration: nil, didInstallLocationManager: true)
+
+        XCTAssertEqual(manager.authorizationRequests, 1, "The host's pending request must not be repeated")
+        XCTAssertEqual(manager.locationStarts, 1)
+    }
+
+    @MainActor func testRemovingOverrideRestoresHostLocationSettings() throws {
+        let map = MLNMapView()
+        map.locationManager = RecordingLocationManager()
+        MapUserLocationConfiguration(isVisible: true, showsHeading: true, requestsAuthorization: true)
+            .apply(to: map)
+        let coordinator = try makeCoordinator()
+        let hidden = locationConfiguration(false)
+
+        coordinator.updateUserLocation(on: map, configuration: hidden, didInstallLocationManager: false)
+        coordinator.updateUserLocation(on: map, configuration: hidden, didInstallLocationManager: false)
+        XCTAssertFalse(map.showsUserLocation)
+        XCTAssertFalse(map.showsUserHeadingIndicator)
+        XCTAssertFalse(map.shouldRequestAuthorizationToUseLocationServices)
+
+        coordinator.updateUserLocation(on: map, configuration: nil, didInstallLocationManager: false)
+
+        XCTAssertTrue(map.showsUserLocation)
+        XCTAssertTrue(map.showsUserHeadingIndicator)
+        XCTAssertTrue(map.shouldRequestAuthorizationToUseLocationServices)
+
+        // Subsequent updates without an override leave host changes alone.
+        map.showsUserHeadingIndicator = false
+        map.shouldRequestAuthorizationToUseLocationServices = false
+        coordinator.updateUserLocation(on: map, configuration: nil, didInstallLocationManager: false)
+        XCTAssertFalse(map.showsUserHeadingIndicator)
+        XCTAssertFalse(map.shouldRequestAuthorizationToUseLocationServices)
+    }
+
     @MainActor func testHidingTrackedLocationDoesNotRestartHeadingIndicator() {
         let manager = RecordingLocationManager()
         let map = MLNMapView()

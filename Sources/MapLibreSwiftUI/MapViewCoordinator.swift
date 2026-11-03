@@ -59,6 +59,7 @@ MLNMapViewDelegate {
     var managedGestureRecognizers: [UIGestureRecognizer] = []
     var isUsingDefaultLocationManager = true
     private var isUserLocationHidden = false
+    private var userLocationSettingsBeforeOverride: MapUserLocationConfiguration?
     private var isApplyingUserLocationConfiguration = false
 
     /// Debounces rapid-fire tile error callbacks so the consumer receives one
@@ -233,13 +234,25 @@ MLNMapViewDelegate {
         let wasShowingHeading = mapView.showsUserHeadingIndicator
         isApplyingUserLocationConfiguration = true
         defer { isApplyingUserLocationConfiguration = false }
-        configuration?.apply(to: mapView)
+        if let configuration {
+            if userLocationSettingsBeforeOverride == nil {
+                userLocationSettingsBeforeOverride = MapUserLocationConfiguration(
+                    isVisible: wasShowingUserLocation,
+                    showsHeading: wasShowingHeading,
+                    requestsAuthorization: mapView.shouldRequestAuthorizationToUseLocationServices
+                )
+            }
+            configuration.apply(to: mapView)
+        } else if let previousSettings = userLocationSettingsBeforeOverride {
+            userLocationSettingsBeforeOverride = nil
+            previousSettings.apply(to: mapView)
+        }
 
         // Native starts the manager when visibility changes from false to true.
         // Installing a manager while the map stays visible needs an explicit restart.
         if didInstallLocationManager, wasShowingUserLocation, mapView.showsUserLocation {
             let manager: any MLNLocationManager = mapView.locationManager
-            if mapView.shouldRequestAuthorizationToUseLocationServices, manager.authorizationStatus == .notDetermined {
+            if configuration?.requestsAuthorization == true, manager.authorizationStatus == .notDetermined {
                 manager.requestWhenInUseAuthorization()
             }
             manager.startUpdatingLocation()
