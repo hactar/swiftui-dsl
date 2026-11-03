@@ -86,7 +86,11 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
         controller.mapView.locationManager = locationManager
         controller.mapView.locationManager = controller.mapView.locationManager
         context.coordinator.isUsingDefaultLocationManager = locationManager == nil
-        userLocationConfiguration?.apply(to: controller.mapView)
+        context.coordinator.updateUserLocation(
+            on: controller.mapView,
+            configuration: userLocationConfiguration,
+            didInstallLocationManager: true
+        )
 
         switch styleSource {
         case let .url(styleURL):
@@ -119,6 +123,7 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
 
     public func updateUIViewController(_ uiViewController: T, context: Context) {
         context.coordinator.parent = self
+        context.coordinator.onUserTrackingModeChange = onMapUserTrackingModeChanged
 
         applyModifiers(uiViewController, runUnsafe: true)
 
@@ -145,12 +150,11 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
             didSwapLocationManager = true
         }
 
-        let wasShowingUserLocation = uiViewController.mapView.showsUserLocation
-        userLocationConfiguration?.apply(to: uiViewController.mapView)
-        // Enabling location display already starts the newly installed manager.
-        if didSwapLocationManager && wasShowingUserLocation {
-            startUpdatesOfSwappedLocationManager(uiViewController.mapView)
-        }
+        context.coordinator.updateUserLocation(
+            on: uiViewController.mapView,
+            configuration: userLocationConfiguration,
+            didInstallLocationManager: didSwapLocationManager
+        )
 
         // FIXME: This should be a more selective update
         context.coordinator.updateStyleSource(styleSource, mapView: uiViewController.mapView)
@@ -172,23 +176,6 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
                 camera: camera,
                 animated: isStyleLoaded
             )
-        }
-    }
-
-    /// Starts location and heading updates on a location manager that replaced another one.
-    ///
-    /// Setting `MLNMapView.locationManager` stops the old manager but does not start the new one.
-    /// Remove this when MapLibre Native starts the new manager itself.
-    @MainActor private func startUpdatesOfSwappedLocationManager(_ mapView: MLNMapView) {
-        guard mapView.showsUserLocation else {
-            return
-        }
-
-        mapView.locationManager.startUpdatingLocation()
-
-        let showsPermanentHeading = mapView.showsUserHeadingIndicator && mapView.userTrackingMode != .followWithCourse
-        if showsPermanentHeading || mapView.userTrackingMode == .followWithHeading {
-            mapView.locationManager.startUpdatingHeading()
         }
     }
 

@@ -46,9 +46,9 @@ public extension View {
     /// Set `requestsAuthorization` to `false` when the application manages permission
     /// requests itself, including when injecting a shared or simulated location manager.
     /// This modifier does not grant location permission or choose a camera position.
-    /// Hiding location also hides its heading indicator. As in MapLibre Native,
-    /// hiding location ends native user tracking; a camera tracking mode can enable
-    /// location display again.
+    /// Hiding location also hides its heading indicator and suspends native
+    /// tracking. When location is shown again, the map honors the current camera
+    /// request if the DSL is managing the camera.
     ///
     /// - Parameters:
     ///   - isVisible: Whether to display the user's location.
