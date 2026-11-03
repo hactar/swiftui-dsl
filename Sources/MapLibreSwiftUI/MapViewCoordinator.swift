@@ -228,7 +228,10 @@ MLNMapViewDelegate {
         didInstallLocationManager: Bool
     ) {
         let hidesUserLocation = configuration?.isVisible == false
-        if hidesUserLocation, !isUserLocationHidden, snapshotCamera?.state.tracksUserLocation == true {
+        let restoresHiddenLocation = configuration == nil && userLocationSettingsBeforeOverride?.isVisible == false
+        if (hidesUserLocation && !isUserLocationHidden) || restoresHiddenLocation,
+           snapshotCamera?.state.tracksUserLocation == true
+        {
             // Native cancels tracking on hide. Reapply the host's request when it becomes visible again.
             snapshotCamera = nil
             if isApplyingTrackingCamera {
@@ -254,6 +257,10 @@ MLNMapViewDelegate {
         } else if let previousSettings = userLocationSettingsBeforeOverride {
             userLocationSettingsBeforeOverride = nil
             previousSettings.apply(to: mapView)
+            if restoresHiddenLocation, parent.camera.state.tracksUserLocation {
+                // Consume the current request so it cannot immediately undo the restored visibility.
+                snapshotCamera = parent.camera
+            }
         }
 
         // Native starts the manager when visibility changes from false to true.

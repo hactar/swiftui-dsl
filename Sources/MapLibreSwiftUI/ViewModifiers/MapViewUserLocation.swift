@@ -49,7 +49,8 @@ public extension View {
     /// Set `requestsAuthorization` to `false` when the application manages permission
     /// requests itself, including when injecting a shared or simulated location manager.
     /// Removing this modifier restores the map's visibility, heading, and
-    /// authorization policy from before the override.
+    /// authorization policy from before the override. If that restores hidden
+    /// location, an unchanged follow request stays suspended until the camera changes.
     /// This modifier does not grant location permission or choose a camera position.
     /// Hiding location also hides its heading indicator and suspends native
     /// tracking. When location is shown again, the map honors the current camera
