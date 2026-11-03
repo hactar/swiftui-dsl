@@ -75,7 +75,8 @@ MapView(styleURL: styleURL, camera: $camera, locationManager: sharedLocationMana
 
 With `requestsAuthorization: false`, the host owns permission requests. The modifier
 uses the injected manager and does not create another location source. Omit the
-modifier to keep a custom host controller's existing settings. Use
+modifier to keep a custom host controller's existing settings. Removing it from
+a mounted map restores the settings captured before the override. Use
 `mapUserAnnotationStyle` separately to customize the annotation's appearance.
 Hiding location also hides its heading indicator and suspends native tracking.
 When location is shown again, the map honors the current camera request if the
