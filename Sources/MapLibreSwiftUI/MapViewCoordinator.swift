@@ -41,6 +41,7 @@ MLNMapViewDelegate {
 
     /// An asyncronous task that applies the camera update and awaits the map to reach idle state.
     var cameraUpdateTask: Task<Void, Never>?
+    private var isApplyingTrackingCamera = false
 
     /// This continuation is closed with the MapView becomes idle at the end of a camera update.
     /// A canceled camera update (think a gesture midway through another camera update)
@@ -221,7 +222,10 @@ MLNMapViewDelegate {
         if hidesUserLocation, !isUserLocationHidden, snapshotCamera?.state.tracksUserLocation == true {
             // Native cancels tracking on hide. Reapply the host's request when it becomes visible again.
             snapshotCamera = nil
-            cameraUpdateTask?.cancel()
+            if isApplyingTrackingCamera {
+                cameraUpdateTask?.cancel()
+                finishCameraUpdate()
+            }
         }
         isUserLocationHidden = hidesUserLocation
 
@@ -260,6 +264,7 @@ MLNMapViewDelegate {
         }
 
         snapshotCamera = camera
+        isApplyingTrackingCamera = camera.state.tracksUserLocation
 
         // Cancel any existing camera update completion task.
         cameraUpdateTask?.cancel()
@@ -536,11 +541,16 @@ MLNMapViewDelegate {
         }
     }
 
-    @MainActor
-    public func mapViewDidBecomeIdle(_ mapView: MLNMapView) {
+    private func finishCameraUpdate() {
         cameraUpdateContinuation?.resume()
         cameraUpdateContinuation = nil
         cameraUpdateTask = nil
+        isApplyingTrackingCamera = false
+    }
+
+    @MainActor
+    public func mapViewDidBecomeIdle(_ mapView: MLNMapView) {
+        finishCameraUpdate()
 
         let viewProxy = MapViewProxy(
             mapView: mapView,
