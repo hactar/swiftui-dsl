@@ -208,6 +208,33 @@ final class MapUserLocationTests: XCTestCase {
         XCTAssertFalse(map.shouldRequestAuthorizationToUseLocationServices)
     }
 
+    @MainActor func testRemovingOverrideRestoresHiddenLocationBeforeApplyingCamera() async throws {
+        let map = MLNMapView()
+        map.locationManager = RecordingLocationManager()
+        let original = locationConfiguration(false)
+        original.apply(to: map)
+        var camera = MapViewCamera.trackUserLocation(zoom: 12)
+        let coordinator = try makeCoordinator(camera: Binding(get: { camera }, set: { camera = $0 }))
+        map.delegate = coordinator
+
+        coordinator.updateUserLocation(on: map, configuration: original, didInstallLocationManager: false)
+        coordinator.applyCameraChangeFromStateUpdate(map, camera: camera, animated: false)
+        XCTAssertNil(coordinator.cameraUpdateTask)
+
+        // Match the representable's update order, including a later update with the same binding.
+        for _ in 0 ..< 2 {
+            coordinator.updateUserLocation(on: map, configuration: nil, didInstallLocationManager: false)
+            coordinator.applyCameraChangeFromStateUpdate(map, camera: camera, animated: false)
+            XCTAssertNil(coordinator.cameraUpdateTask)
+            XCTAssertFalse(map.showsUserLocation)
+            XCTAssertEqual(map.userTrackingMode, .none)
+        }
+
+        camera = .trackUserLocation(zoom: 13)
+        await applyFollowCamera(camera, on: map, coordinator: coordinator)
+        XCTAssertTrue(map.showsUserLocation)
+    }
+
     @MainActor func testHidingTrackedLocationDoesNotRestartHeadingIndicator() {
         let manager = RecordingLocationManager()
         let map = MLNMapView()
