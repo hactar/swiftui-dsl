@@ -235,6 +235,7 @@ MLNMapViewDelegate {
 
         let wasShowingUserLocation = mapView.showsUserLocation
         let wasShowingHeading = mapView.showsUserHeadingIndicator
+        let wasRequestingAuthorization = mapView.shouldRequestAuthorizationToUseLocationServices
         isApplyingUserLocationConfiguration = true
         defer { isApplyingUserLocationConfiguration = false }
         if let configuration {
@@ -242,7 +243,7 @@ MLNMapViewDelegate {
                 userLocationSettingsBeforeOverride = MapUserLocationConfiguration(
                     isVisible: wasShowingUserLocation,
                     showsHeading: wasShowingHeading,
-                    requestsAuthorization: mapView.shouldRequestAuthorizationToUseLocationServices
+                    requestsAuthorization: wasRequestingAuthorization
                 )
             }
             configuration.apply(to: mapView)
@@ -255,13 +256,19 @@ MLNMapViewDelegate {
             }
         }
 
-        // Native starts the manager when visibility changes from false to true.
+        // Native validates location services when visibility changes from false to true.
+        guard wasShowingUserLocation, mapView.showsUserLocation else { return }
+
+        let manager: any MLNLocationManager = mapView.locationManager
+        if configuration?.requestsAuthorization == true,
+           didInstallLocationManager || !wasRequestingAuthorization,
+           manager.authorizationStatus == .notDetermined
+        {
+            manager.requestWhenInUseAuthorization()
+        }
+
         // Installing a manager while the map stays visible needs an explicit restart.
-        if didInstallLocationManager, wasShowingUserLocation, mapView.showsUserLocation {
-            let manager: any MLNLocationManager = mapView.locationManager
-            if configuration?.requestsAuthorization == true, manager.authorizationStatus == .notDetermined {
-                manager.requestWhenInUseAuthorization()
-            }
+        if didInstallLocationManager {
             manager.startUpdatingLocation()
             let mode = mapView.userTrackingMode
             // Native revalidates heading updates when the indicator changes.

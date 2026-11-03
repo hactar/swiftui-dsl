@@ -163,6 +163,36 @@ final class MapUserLocationTests: XCTestCase {
         }
     }
 
+    @MainActor func testEnablingAuthorizationWhileVisibleRequestsOnceWithoutRestartingManager() throws {
+        let map = MLNMapView()
+        let manager = RecordingLocationManager()
+        manager.authorizationStatus = .notDetermined
+        map.locationManager = manager
+        let coordinator = try makeCoordinator()
+        coordinator.updateUserLocation(
+            on: map,
+            configuration: locationConfiguration(true),
+            didInstallLocationManager: false
+        )
+        XCTAssertEqual(manager.authorizationRequests, 0)
+        let locationStarts = manager.locationStarts
+
+        let requestsAuthorization = MapUserLocationConfiguration(
+            isVisible: true,
+            showsHeading: false,
+            requestsAuthorization: true
+        )
+        for _ in 0 ..< 2 {
+            coordinator.updateUserLocation(
+                on: map,
+                configuration: requestsAuthorization,
+                didInstallLocationManager: false
+            )
+            XCTAssertEqual(manager.authorizationRequests, 1)
+            XCTAssertEqual(manager.locationStarts, locationStarts)
+        }
+    }
+
     @MainActor func testVisibleManagerSwapWithoutModifierLeavesAuthorizationToHost() throws {
         let map = MLNMapView()
         map.locationManager = RecordingLocationManager()
