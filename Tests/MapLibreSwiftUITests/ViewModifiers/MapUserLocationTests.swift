@@ -139,6 +139,51 @@ final class MapUserLocationTests: XCTestCase {
         XCTAssertEqual(manager.headingStarts, 1)
     }
 
+    @MainActor func testVisibleManagerSwapHonorsAuthorizationPolicy() throws {
+        let map = MLNMapView()
+        map.locationManager = RecordingLocationManager()
+        locationConfiguration(true).apply(to: map)
+        let coordinator = try makeCoordinator()
+
+        for requestsAuthorization in [true, false] {
+            let manager = RecordingLocationManager()
+            manager.authorizationStatus = .notDetermined
+            map.locationManager = manager
+            coordinator.updateUserLocation(
+                on: map,
+                configuration: MapUserLocationConfiguration(
+                    isVisible: true,
+                    showsHeading: false,
+                    requestsAuthorization: requestsAuthorization
+                ),
+                didInstallLocationManager: true
+            )
+            XCTAssertEqual(manager.authorizationRequests, requestsAuthorization ? 1 : 0)
+            XCTAssertEqual(manager.locationStarts, 1)
+        }
+    }
+
+    @MainActor func testHidingTrackedLocationDoesNotRestartHeadingIndicator() {
+        let manager = RecordingLocationManager()
+        let map = MLNMapView()
+        map.locationManager = manager
+        MapUserLocationConfiguration(isVisible: true, showsHeading: true, requestsAuthorization: false)
+            .apply(to: map)
+        map.userTrackingMode = .follow
+        XCTAssertTrue(map.showsUserHeadingIndicator)
+        let headingStarts = manager.headingStarts
+        let headingStops = manager.headingStops
+        XCTAssertGreaterThan(headingStarts, 0)
+
+        locationConfiguration(false).apply(to: map)
+
+        XCTAssertFalse(map.showsUserHeadingIndicator)
+        XCTAssertFalse(map.showsUserLocation)
+        XCTAssertEqual(map.userTrackingMode, .none)
+        XCTAssertEqual(manager.headingStarts, headingStarts)
+        XCTAssertGreaterThan(manager.headingStops, headingStops)
+    }
+
     @MainActor private func makeCoordinator(camera: Binding<MapViewCamera> = .constant(.default())) throws
         -> MapViewCoordinator<MLNMapViewController>
     {
@@ -248,6 +293,7 @@ private final class RecordingLocationManager: NSObject, @preconcurrency MLNLocat
     var locationStarts = 0
     var locationStops = 0
     var headingStarts = 0
+    var headingStops = 0
     var authorizationRequests = 0
     func requestAlwaysAuthorization() {
         authorizationRequests += 1
@@ -269,6 +315,9 @@ private final class RecordingLocationManager: NSObject, @preconcurrency MLNLocat
         headingStarts += 1
     }
 
-    func stopUpdatingHeading() {}
+    func stopUpdatingHeading() {
+        headingStops += 1
+    }
+
     func dismissHeadingCalibrationDisplay() {}
 }

@@ -10,12 +10,15 @@ struct MapUserLocationConfiguration: Equatable, Sendable {
         // Set the permission policy before enabling location presentation, which
         // may start the installed location manager immediately.
         mapView.shouldRequestAuthorizationToUseLocationServices = requestsAuthorization
+        if !isVisible, mapView.showsUserHeadingIndicator {
+            // Hiding resets tracking. Clear the indicator before Native revalidates heading.
+            mapView.showsUserHeadingIndicator = false
+        }
         mapView.showsUserLocation = isVisible
-        // Native's heading setter also enables location display. Hidden location
-        // therefore takes precedence, even when heading display was requested.
-        let effectiveHeading = isVisible && showsHeading
-        if mapView.showsUserHeadingIndicator != effectiveHeading {
-            mapView.showsUserHeadingIndicator = effectiveHeading
+
+        // Enabling the heading indicator in Native also shows the user's location.
+        if isVisible, mapView.showsUserHeadingIndicator != showsHeading {
+            mapView.showsUserHeadingIndicator = showsHeading
         }
     }
 }
