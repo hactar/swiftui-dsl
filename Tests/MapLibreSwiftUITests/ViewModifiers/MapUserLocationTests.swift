@@ -243,10 +243,18 @@ final class MapUserLocationTests: XCTestCase {
         map.locationManager = RecordingLocationManager()
         let original = locationConfiguration(false)
         original.apply(to: map)
-        var camera = MapViewCamera.trackUserLocation(zoom: 12)
+        var camera = MapViewCamera.center(CLLocationCoordinate2D(latitude: 48.2, longitude: 16.3), zoom: 12)
         let coordinator = try makeCoordinator(camera: Binding(get: { camera }, set: { camera = $0 }))
         map.delegate = coordinator
 
+        // Begin with a fitted viewport so restoring visibility also has to consume
+        // the viewport snapshot when the suppressed request switches to follow.
+        coordinator.applyCameraChangeFromStateUpdate(map, camera: camera, animated: false)
+        let centering = try XCTUnwrap(coordinator.cameraUpdateTask)
+        centering.cancel()
+        await centering.value
+        coordinator.mapViewDidBecomeIdle(map)
+        camera = .trackUserLocation(zoom: 12)
         coordinator.updateUserLocation(on: map, configuration: original, didInstallLocationManager: false)
         coordinator.applyCameraChangeFromStateUpdate(map, camera: camera, animated: false)
         XCTAssertNil(coordinator.cameraUpdateTask)

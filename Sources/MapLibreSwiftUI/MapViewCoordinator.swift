@@ -261,6 +261,7 @@ MLNMapViewDelegate {
             if restoresHiddenLocation, parent.camera.state.tracksUserLocation {
                 // Consume the current request so it cannot immediately undo the restored visibility.
                 snapshotCamera = parent.camera
+                snapshotCameraViewport = fittedCameraViewport(mapView, camera: parent.camera)
             }
         }
 
@@ -327,7 +328,8 @@ MLNMapViewDelegate {
         let animated = animated && transaction?.disablesAnimations != true
         let viewport = fittedCameraViewport(mapView, camera: camera)
         guard !(isUserLocationHidden && camera.state.tracksUserLocation),
-              camera != snapshotCamera || viewport != snapshotCameraViewport else {
+              camera != snapshotCamera || viewport != snapshotCameraViewport
+        else {
             // An unchanged camera still needs updating when its viewport changes.
             return
         }
