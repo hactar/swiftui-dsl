@@ -85,3 +85,35 @@ struct CameraShowcasePolylinePreview: View {
     CameraShowcasePolylinePreview(styleURL: demoTilesURL)
         .ignoresSafeArea(.all)
 }
+
+struct CameraNativeAnimationPreview: View {
+    @State private var camera = MapViewCamera.center(
+        CLLocationCoordinate2D(latitude: 48.8566, longitude: 2.3522), zoom: 11
+    )
+    @State private var animated = false
+    @State private var nextDestinationIsNewYork = true
+    @State private var isStyleLoaded = false
+
+    let styleURL: URL
+
+    var body: some View {
+        VStack {
+            MapView(styleURL: styleURL, camera: $camera)
+                .onMapStyleLoaded { _ in isStyleLoaded = true }
+            Toggle("Use Native camera animation", isOn: $animated)
+            Button(nextDestinationIsNewYork ? "Move to New York" : "Move to Paris") {
+                let destination = nextDestinationIsNewYork
+                    ? CLLocationCoordinate2D(latitude: 40.7128, longitude: -74.0060)
+                    : CLLocationCoordinate2D(latitude: 48.8566, longitude: 2.3522)
+                camera = .center(destination, zoom: 11, animated: animated)
+                nextDestinationIsNewYork.toggle()
+            }
+            .disabled(!isStyleLoaded)
+        }
+        .padding()
+    }
+}
+
+#Preview("Native camera animation") {
+    CameraNativeAnimationPreview(styleURL: demoTilesURL)
+}
