@@ -124,6 +124,9 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
     public func updateUIViewController(_ uiViewController: T, context: Context) {
         context.coordinator.parent = self
         context.coordinator.onUserTrackingModeChange = onMapUserTrackingModeChanged
+        // A style reload must use the current handler, including a wrapper's
+        // forwarded environment value, rather than the closure from creation.
+        context.coordinator.onStyleLoaded = onMapStyleLoaded
 
         applyModifiers(uiViewController, runUnsafe: true)
 
