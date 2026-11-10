@@ -1,6 +1,7 @@
 import CoreLocation
 import MapLibre
 import Mockable
+import SwiftUI
 import XCTest
 @testable import MapLibreSwiftUI
 
