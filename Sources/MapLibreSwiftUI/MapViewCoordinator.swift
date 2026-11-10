@@ -2,7 +2,6 @@ import Combine
 import Foundation
 import MapLibre
 import MapLibreSwiftDSL
-import SwiftUI
 
 extension MLNCameraChangeReason: @retroactive CustomStringConvertible {
     private static let descriptions: [(Self, String)] = [
@@ -218,18 +217,19 @@ MLNMapViewDelegate {
     /// - Parameters:
     ///   - mapView: The MapView that the state is being updated for.
     ///   - camera: The new camera state
-    ///   - animated: Whether the camera change should be animated. Defaults to `true`.
+    ///   - animated: Whether animation is permitted. Initial positioning passes `false`.
+    ///     The camera's own `animated` preference must also be `true` to animate.
     @MainActor func applyCameraChangeFromStateUpdate(
         _ mapView: MLNMapViewRepresentable,
         camera: MapViewCamera,
-        animated: Bool = true,
-        transaction: Transaction? = nil
+        animated: Bool = true
     ) {
-        // Continuous interactions can explicitly request immediate camera updates
-        // using SwiftUI's existing transaction, without another camera API.
-        let animated = animated && transaction?.disablesAnimations != true
-        guard camera != snapshotCamera else {
-            // No action - camera has not changed.
+        let animated = animated && camera.animated
+        // Animation is an update preference, not a new viewpoint to apply.
+        let hasSameViewpoint = camera.state == snapshotCamera?.state
+            && camera.lastReasonForChange == snapshotCamera?.lastReasonForChange
+        guard !hasSameViewpoint else {
+            snapshotCamera = camera
             return
         }
 
@@ -434,7 +434,8 @@ MLNMapViewDelegate {
                     pitch: mapView.camera.pitch,
                     pitchRange: pitchRange,
                     direction: mapView.direction,
-                    reason: reason
+                    reason: reason,
+                    animated: parent.camera.animated
                 )
             }
         }
