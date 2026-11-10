@@ -37,6 +37,8 @@ struct MapCameraAnimationTests {
         camera.setZoom(14)
         camera.setPitch(30)
         #expect(!camera.animated)
+        camera.pan(.right)
+        #expect(!camera.animated)
     }
 
     /// The choice must reach Native for a loaded map, while initial positioning must never animate.
@@ -92,7 +94,12 @@ struct MapCameraAnimationTests {
                 styleURL: URL(fileURLWithPath: "/unused-style.json"),
                 camera: Binding(get: { value.camera }, set: { value.camera = $0 })
             )
-            coordinator = view.makeCoordinator()
+            coordinator = MapViewCoordinator(
+                parent: view,
+                onGesture: { _, _ in },
+                onViewProxyChanged: { _ in },
+                proxyUpdateMode: .onFinish
+            )
             given(map).frame.willReturn(CGRect(x: 0, y: 0, width: 320, height: 640))
             given(map).contentInset.willReturn(.zero)
             given(map).camera.willReturn(MLNMapCamera())
