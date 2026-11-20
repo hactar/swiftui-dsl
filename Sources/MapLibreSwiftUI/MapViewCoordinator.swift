@@ -320,14 +320,19 @@ MLNMapViewDelegate {
     @MainActor func applyCameraChangeFromStateUpdate(
         _ mapView: MLNMapViewRepresentable,
         camera: MapViewCamera,
-        animated: Bool = true
+        animated: Bool = true,
+        reframing: Bool = false
     ) {
+        // A content inset change interrupts any camera animation, so finish it within the new inset.
+        // MapLibre reframes a camera that's already tracking.
+        let isReframing = reframing
+            && !(camera.state.isTrackingUserLocation && mapView.userTrackingMode != .none)
         let animated = animated && camera.animated
         let viewport = fittedCameraViewport(mapView, camera: camera)
         let hasSameViewpoint = camera.state == snapshotCamera?.state
             && camera.lastReasonForChange == snapshotCamera?.lastReasonForChange
         guard !(isUserLocationHidden && camera.state.tracksUserLocation) else { return }
-        guard !hasSameViewpoint || viewport != snapshotCameraViewport else {
+        guard !hasSameViewpoint || isReframing || viewport != snapshotCameraViewport else {
             // Animation alone does not change a viewpoint; layout changes still require a refit.
             snapshotCamera = camera
             return
@@ -509,6 +514,12 @@ MLNMapViewDelegate {
         }
     }
 
+    /// Fits a bounding box or showcase camera to the map's new size.
+    @MainActor func refitAfterResize() {
+        guard let mapView else { return }
+        refitCameraAfterLayout(mapView, cameraUpdatesEnabled: !parent.cameraDisabled)
+    }
+
     /// Apply a gesture based camera change. This behavior will only be triggered on the first gesture and will
     /// only be completed when the mapView becomes idle.
     ///
@@ -550,6 +561,17 @@ MLNMapViewDelegate {
         }
     }
 
+    /// Cancels the pending camera update and resumes its continuation.
+    ///
+    /// Call this when SwiftUI removes the map view. Until the map becomes idle, the pending task holds
+    /// the map view and the coordinator.
+    @MainActor func cancelCameraUpdate() {
+        cameraUpdateTask?.cancel()
+        cameraUpdateTask = nil
+        cameraUpdateContinuation?.resume()
+        cameraUpdateContinuation = nil
+    }
+
     // MARK: - MLNMapViewDelegate
 
     @MainActor
@@ -568,11 +590,12 @@ MLNMapViewDelegate {
     /// Only ``MLNTileOperation/error`` is acted on, it indicates a tile
     /// request failed, typically due to no internet or a poor connection.
     ///
-    /// The callback is debounced to 3ms, a burst of simultaneously
+    /// The callback is debounced to 300ms, a burst of simultaneously
     /// failing tiles within the window produces a single notification
     /// rather than many.
-    @MainActor
-    public func mapView(
+    ///
+    /// MapLibre calls this off the main thread.
+    public nonisolated func mapView(
         _: MLNMapView,
         tileDidTriggerAction operation: MLNTileOperation,
         x _: Int,
@@ -583,8 +606,14 @@ MLNMapViewDelegate {
         sourceID _: String
     ) {
         guard operation == .error else { return }
+        Task { @MainActor in
+            self.debounceTileError()
+        }
+    }
+
+    private func debounceTileError() {
         tileErrorDebounceTask?.cancel()
-        tileErrorDebounceTask = Task { @MainActor in
+        tileErrorDebounceTask = Task {
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
             onMapTileError?()

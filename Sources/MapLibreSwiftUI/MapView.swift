@@ -78,6 +78,9 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
         let controller = makeViewController()
         controller.mapView.delegate = context.coordinator
         context.coordinator.mapView = controller.mapView
+        (controller as? MLNMapViewController)?.onSizeChange = { [weak coordinator = context.coordinator] in
+            coordinator?.refitAfterResize()
+        }
 
         // Apply modifiers, suppressing camera update propagation (this messes with setting our initial camera as
         // content insets can trigger a change)
@@ -128,6 +131,7 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
         context.coordinator.onStyleLoaded = onMapStyleLoaded
         context.coordinator.onUserTrackingModeChange = onMapUserTrackingModeChanged
 
+        let isContentInsetChanging = mapContentInset.map { $0 != uiViewController.mapView.contentInset } ?? false
         applyModifiers(uiViewController, runUnsafe: true)
 
         // `nil` here means "use MapLibre's built-in default manager", but
@@ -177,15 +181,32 @@ public struct MapView<T: MapViewHostViewController>: UIViewControllerRepresentab
             context.coordinator.applyCameraChangeFromStateUpdate(
                 uiViewController.mapView,
                 camera: camera,
-                animated: isStyleLoaded
+                animated: isStyleLoaded,
+                reframing: isContentInsetChanging
             )
         }
+    }
+
+    /// Cancels the pending camera update. SwiftUI calls this method when it removes the map view.
+    ///
+    /// Cancels the pending camera update.
+    ///
+    /// This is an optional SwiftUI Coordinator pattern function as seen in
+    /// [dismantleuiviewcontroller(_:coordinator:)](https://developer.apple.com/documentation/swiftui/uiviewcontrollerrepresentable/dismantleuiviewcontroller(_:coordinator:)-30a1m)
+    ///
+    /// - Parameter coordinator: The coordinator of the removed map view.
+    public static func dismantleUIViewController(_: T, coordinator: MapViewCoordinator<T>) {
+        coordinator.cancelCameraUpdate()
     }
 
     @MainActor private func applyModifiers(_ mapViewController: T, runUnsafe: Bool) {
         if let mapContentInset {
             mapViewController.mapView.automaticallyAdjustsContentInset = false
-            mapViewController.mapView.contentInset = mapContentInset
+            mapViewController.mapView.setContentInset(
+                mapContentInset,
+                animated: mapViewController.mapView.style != nil,
+                completionHandler: nil
+            )
         }
 
         // Assume all controls are hidden by default (so that an empty list returns a map with no controls)
